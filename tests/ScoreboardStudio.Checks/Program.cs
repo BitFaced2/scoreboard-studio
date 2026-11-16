@@ -123,6 +123,19 @@ Check("Detector separates all six synthetic test fields", () =>
     var regions = FieldDetector.Detect(SyntheticBoard.Render(10),90);
     Require(regions.Count == 6, $"Expected six test regions, got {regions.Count}.");
 });
+Check("Automatic detection ignores bright room surfaces and groups narrow digit fragments", () =>
+{
+    var f=Solid(640,360,40,40,40);
+    void Block(int left,int top,int width,int height,byte r,byte g,byte b)
+    {for(int y=top;y<top+height;y++)for(int x=left;x<left+width;x++){int p=(y*640+x)*4;f.Pixels[p]=b;f.Pixels[p+1]=g;f.Pixels[p+2]=r;}}
+    Block(0,0,150,360,230,230,230);
+    Block(220,100,5,45,255,170,30);Block(249,100,45,45,255,170,30);
+    Block(400,100,70,45,255,170,30);
+    var detected=FieldDetector.DetectAutomatic(f);
+    Require(detected.Isolation=="Bright colors" && detected.Regions.Count==2,"Room highlights or split digits corrupted automatic fields.");
+    Require(detected.Regions.All(r=>r.X>150/640.0),"Bright wall was accepted as a field.");
+    Require(FieldDetector.DetectAutomatic(Solid(320,180,0,0,0)).Regions.Count==0,"Blank frame created automatic fields.");
+});
 Check("Setup round trip preserves fields and rejects malformed or future layouts", () =>
 {
     string path = Path.Combine(Path.GetTempPath(), Guid.NewGuid()+".json");
@@ -134,6 +147,11 @@ Check("Setup round trip preserves fields and rejects malformed or future layouts
         var read = Layout.Load(path);
         Require(read.Fields.Count==6 && read.SourceName=="Camera A" && read.Fields[0].Cleanup.CustomColor=="#123456" && read.Fields[0].Id==fields[0].Id, "Settings did not round-trip.");
         Require(read.Perspective.Enabled && read.Perspective.TopLeft.X==.1 && read.ImagePath=="scoreboard.png" && read.Fields[0].Cleanup.Isolation=="White highlights", "Perspective/image/isolation settings did not round-trip.");
+        read.ImagePath=null;read.VideoPath="../footage/game.mp4";read.Save(path);
+        Require(Layout.Load(path).VideoPath=="../footage/game.mp4","Video path did not round-trip.");
+        read.ImagePath="scoreboard.png";read.Save(path);
+        bool bothRejected=false;try {Layout.Load(path);}catch(InvalidDataException){bothRejected=true;}
+        Require(bothRejected,"Ambiguous image and video source was accepted.");
         File.WriteAllText(path,"{\"Fields\":[]}");
         var old = Layout.Load(path);
         Require(!old.Perspective.Enabled,"Old layouts unexpectedly enabled perspective.");

@@ -22,52 +22,49 @@ public partial class MainWindow
         return new(converted.PixelWidth, converted.PixelHeight, pixels);
     }
 
-    private void OpenLayout(string path, bool sample = false)
+    private void OpenLayout(string path)
     {
         var layout = Layout.Load(path);
-        VideoFrame? loadedImage = null;
-        string? imagePath = null, missingImage = null;
-        if (!string.IsNullOrWhiteSpace(layout.ImagePath))
-        {
-            imagePath = System.IO.Path.GetFullPath(layout.ImagePath, System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(path))!);
-            if (File.Exists(imagePath)) loadedImage = LoadImage(imagePath);
-            else missingImage = imagePath;
-        }
+        string? mediaPath = layout.VideoPath ?? layout.ImagePath;
+        if (!string.IsNullOrWhiteSpace(mediaPath))
+            mediaPath = System.IO.Path.GetFullPath(mediaPath, System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(path))!);
+        bool missing = mediaPath is not null && !File.Exists(mediaPath);
+        // Decode images before changing the existing setup, so an invalid image
+        // does not discard the operator's current source or geometry.
+        VideoFrame? image = mediaPath is not null && !missing && layout.VideoPath is null ? LoadImage(mediaPath) : null;
         EndPerspectiveEditing();
         output = false; OutputButton.Content = "Start NDI outputs"; generation++;
         fields.Clear(); foreach (var field in layout.Fields) fields.Add(field);
         perspective = layout.Perspective with { };
-        if (imagePath is not null)
-        { kind = loadedImage is null ? "None" : "Image"; still = loadedImage; stillPath = imagePath; source = null; }
+        if (mediaPath is not null)
+        {
+            if (missing) SwitchSource("None");
+            else if (image is not null) { SwitchSource("Image",image:image); stillPath=mediaPath; }
+            else LoadMedia(mediaPath);
+        }
         else if (layout.SourceName is not null)
         {
-            kind = "None"; source = null; still = null; stillPath = null;
+            SwitchSource("None");
             SourceCombo.SelectedItem = SourceCombo.Items.Cast<NdiSource>().FirstOrDefault(s => s.Name == layout.SourceName);
         }
         suggestions.Clear(); beforeDetection = null; AcceptDetection.Visibility = UndoDetection.Visibility = Visibility.Collapsed;
-        savePath = sample ? null : path; setupName = layout.Name; dirty = false;
-        SetupTitle.Text = setupName + (sample ? " • Sample" : " • Saved");
+        savePath = path; setupName = layout.Name; dirty = false;
+        SetupTitle.Text = setupName + " • Saved";
         DetectionIsolation.SelectedIndex = fields.FirstOrDefault()?.Cleanup.Isolation == "White highlights" ? 1 : 0;
         DetectionThreshold.Value = fields.FirstOrDefault()?.Cleanup.Threshold ?? 130;
         SyncFields(); PopulateInspector(); UpdatePerspectiveStatus(); PushPlan();
-        Notice.Text = missingImage is not null ? "Setup loaded, but its image is missing. Open scoreboard image: " + missingImage
-            : sample ? "Your real scoreboard photo with ten manually prepared fields. This is a still image; outputs are labeled STILL."
+        CancelAutomaticDetection();
+        Notice.Text = missing ? "Setup loaded. Use Load image or video to locate the missing file: " + mediaPath
             : layout.SourceName is not null ? $"Setup loaded. Connect to {layout.SourceName}, then review the crops."
             : "Setup loaded. Review the fields before starting outputs.";
-    }
-
-    private void RealSampleClick(object sender, RoutedEventArgs e)
-    {
-        if (locked || !ConfirmDiscard()) return;
-        try { OpenLayout(System.IO.Path.Combine(AppContext.BaseDirectory, "samples", "real-scoreboard", "real-scoreboard.scoreboard.json"), sample: true); }
-        catch (Exception ex) { Notice.Text = "Could not open sample: " + ex.Message; }
     }
 
     private void PerspectiveClick(object sender, RoutedEventArgs e)
     {
         if (locked || engine.Preview.RawSource is not { } frame || !engine.Preview.Healthy)
-        { Notice.Text = "Connect a healthy source or open an image before adjusting perspective."; return; }
+        { Notice.Text = "Connect a source or load an image or video before adjusting perspective."; return; }
         if (EditingPerspective) { EndPerspectiveEditing(); return; }
+        CancelAutomaticDetection();
         output = false; OutputButton.Content = "Start NDI outputs";
         drawing = false; draft = null; DrawButton.Content = "+ Draw a field";
         suggestions.Clear(); AcceptDetection.Visibility = Visibility.Collapsed;

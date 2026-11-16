@@ -2,8 +2,8 @@ using System.Diagnostics;
 
 namespace ScoreboardStudio.Core;
 
-public sealed record EnginePlan(string Kind, NdiSource? Source, VideoFrame? Still, ScoreField[] Fields, bool Output, int Generation, PerspectiveSettings? Perspective = null);
-public sealed record EnginePreview(VideoFrame? Source, IReadOnlyDictionary<Guid, VideoFrame> Fields, string Status, bool Healthy, int OutputCount, double ProcessingMs, VideoFrame? RawSource = null);
+public sealed record EnginePlan(string Kind, NdiSource? Source, VideoFrame? Still, ScoreField[] Fields, bool Output, int Generation, PerspectiveSettings? Perspective = null, IPlaybackSource? Playback = null);
+public sealed record EnginePreview(VideoFrame? Source, IReadOnlyDictionary<Guid, VideoFrame> Fields, string Status, bool Healthy, int OutputCount, double ProcessingMs, VideoFrame? RawSource = null, int Generation = -1);
 
 // All receivers and senders belong to this worker; the UI only exchanges immutable snapshots.
 public sealed class VideoEngine : IDisposable
@@ -44,6 +44,12 @@ public sealed class VideoEngine : IDisposable
                     switch (current.Kind)
                     {
                         case "Image": latest = current.Still; healthy = latest is not null; status = "STILL IMAGE • Setup only"; break;
+                        case "Video":
+                            var playback = current.Playback?.Snapshot;
+                            latest = playback?.Frame;
+                            healthy = playback?.Healthy ?? false;
+                            status = playback?.Status ?? "Opening video";
+                            break;
                         case "NDI":
                             if (receiver is null && clock.Elapsed.TotalSeconds >= retryAt)
                             { receiver = new NdiReceiver(current.Source!); retryAt = clock.Elapsed.TotalSeconds + 3; }
@@ -79,7 +85,7 @@ public sealed class VideoEngine : IDisposable
                         if (!senders.ContainsKey(field.Id)) senders[field.Id] = new NdiSender(OutputName(current.Kind, field.Name));
                         senders[field.Id].Send(fields[field.Id]);
                     }
-                    Volatile.Write(ref preview, new(working, fields, status, healthy, senders.Count, clock.Elapsed.TotalMilliseconds - start, latest));
+                    Volatile.Write(ref preview, new(working, fields, status, healthy, senders.Count, clock.Elapsed.TotalMilliseconds - start, latest, generation));
                 }
                 catch (Exception ex)
                 {
@@ -87,7 +93,7 @@ public sealed class VideoEngine : IDisposable
                     { try { sender.Send(new(2, 2, new byte[16])); } catch { } sender.Dispose(); }
                     senders.Clear(); receiver?.Dispose(); receiver = null; latest = null;
                     retryAt = clock.Elapsed.TotalSeconds + 3;
-                    Volatile.Write(ref preview, new(null, new Dictionary<Guid, VideoFrame>(), "ERROR • " + ex.Message, false, 0, 0));
+                    Volatile.Write(ref preview, new(null, new Dictionary<Guid, VideoFrame>(), "ERROR • " + ex.Message, false, 0, 0, Generation:generation));
                     await Task.Delay(1000, cancellation.Token);
                 }
                 int delay = Math.Max(1, 33 - (int)(clock.Elapsed.TotalMilliseconds - start));

@@ -1,4 +1,4 @@
-param([switch]$IncludeReferencePhoto, [switch]$VerifyNdi, [string]$UserGuide)
+param([switch]$VerifyReferencePhoto, [switch]$VerifyNdi, [string]$UserGuide)
 $ErrorActionPreference = 'Stop'
 $taskRoot = Split-Path $PSScriptRoot -Parent
 Push-Location -LiteralPath $taskRoot
@@ -12,14 +12,14 @@ try {
     $taskPackage = Join-Path $taskRun $taskName
     $taskAssets = Join-Path $taskRun 'assets'
     New-Item -ItemType Directory -Path $taskPackage, $taskAssets -Force | Out-Null
-    if ($IncludeReferencePhoto -and -not (Test-Path -LiteralPath 'samples/real-scoreboard/scoreboard.png')) { throw 'Reference photo is missing.' }
+    if ($VerifyReferencePhoto -and -not (Test-Path -LiteralPath 'samples/real-scoreboard/scoreboard.png')) { throw 'Reference photo is missing.' }
     if ($UserGuide -and -not (Test-Path -LiteralPath $UserGuide -PathType Leaf)) { throw 'User guide is missing.' }
     dotnet build ScoreboardStudio.sln -c Release
     if ($LASTEXITCODE -ne 0) { throw 'Build failed.' }
     $taskCheckArgs = @('run', '--project', 'tests/ScoreboardStudio.Checks', '-c', 'Release', '--no-build')
-    if ($VerifyNdi -or $IncludeReferencePhoto) { $taskCheckArgs += '--' }
+    if ($VerifyNdi -or $VerifyReferencePhoto) { $taskCheckArgs += '--' }
     if ($VerifyNdi) { $taskCheckArgs += '--ndi' }
-    if ($IncludeReferencePhoto) { $taskCheckArgs += @('--image', 'samples/real-scoreboard/scoreboard.png', 'samples/real-scoreboard/real-scoreboard.scoreboard.json', (Join-Path $taskRun 'image-checks')) }
+    if ($VerifyReferencePhoto) { $taskCheckArgs += @('--image', 'samples/real-scoreboard/scoreboard.png', 'samples/real-scoreboard/real-scoreboard.scoreboard.json', (Join-Path $taskRun 'image-checks')) }
     & dotnet @taskCheckArgs
     if ($LASTEXITCODE -ne 0) { throw 'Checks failed.' }
     dotnet publish src/ScoreboardStudio.App -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o $taskPublish
@@ -29,13 +29,6 @@ try {
     Copy-Item -LiteralPath (Join-Path $taskPublish 'ScoreboardStudio.exe') -Destination $taskPackage
     Copy-Item -LiteralPath 'README.md', 'distribution/START-HERE.txt' -Destination $taskPackage
     if ($UserGuide) { Copy-Item -LiteralPath $UserGuide -Destination (Join-Path $taskPackage 'TMS Scoreboard Studio - User Guide.pdf') }
-    $taskClockSample = Join-Path $taskPackage 'samples/recorded-clock'
-    New-Item -ItemType Directory -Path $taskClockSample -Force | Out-Null
-    Copy-Item -Path 'samples/recorded-clock/*' -Destination $taskClockSample
-    $taskSample = Join-Path $taskPackage 'samples/real-scoreboard'
-    New-Item -ItemType Directory -Path $taskSample -Force | Out-Null
-    Copy-Item -LiteralPath 'samples/real-scoreboard/real-scoreboard.scoreboard.json' -Destination $taskSample
-    if ($IncludeReferencePhoto) { Copy-Item -LiteralPath 'samples/real-scoreboard/scoreboard.png' -Destination $taskSample }
 
     # Preserve notices for the actual .NET runtimes embedded in this executable.
     $taskConfig = Get-Content -LiteralPath 'src/ScoreboardStudio.App/bin/Release/net8.0-windows/win-x64/ScoreboardStudio.runtimeconfig.json' -Raw | ConvertFrom-Json
@@ -56,12 +49,19 @@ try {
     }
     $taskCommit = git rev-parse HEAD
     if ($LASTEXITCODE -ne 0) { throw 'Cannot determine source commit.' }
-    $taskInfo = "Scoreboard Studio $taskVersion`r`nSource commit: $taskCommit`r`nPlatform: Windows x64`r`n.NET: bundled`r`nNDI runtime: not bundled`r`nReference photo included: $IncludeReferencePhoto`r`n"
+    $taskInfo = "TMS Scoreboard Studio $taskVersion`r`nSource commit: $taskCommit`r`nPlatform: Windows x64`r`n.NET: bundled`r`nNDI runtime: not bundled`r`nMedia files: supplied by operator`r`n"
     [IO.File]::WriteAllText((Join-Path $taskPackage 'BUILD-INFO.txt'), $taskInfo)
     $taskZip = Join-Path $taskAssets ($taskName + '.zip')
     Compress-Archive -LiteralPath $taskPackage -DestinationPath $taskZip -CompressionLevel Optimal
     $taskHash = (Get-FileHash -LiteralPath $taskZip -Algorithm SHA256).Hash.ToLowerInvariant()
-    [IO.File]::WriteAllText((Join-Path $taskAssets 'SHA256SUMS.txt'), ($taskHash + '  ' + $taskName + ".zip`n"))
+    $taskChecksums = $taskHash + '  ' + $taskName + ".zip`n"
+    if ($UserGuide) {
+        $taskGuideAsset = Join-Path $taskAssets 'TMS-Scoreboard-Studio-User-Guide.pdf'
+        Copy-Item -LiteralPath $UserGuide -Destination $taskGuideAsset
+        $taskGuideHash = (Get-FileHash -LiteralPath $taskGuideAsset -Algorithm SHA256).Hash.ToLowerInvariant()
+        $taskChecksums += $taskGuideHash + "  TMS-Scoreboard-Studio-User-Guide.pdf`n"
+    }
+    [IO.File]::WriteAllText((Join-Path $taskAssets 'SHA256SUMS.txt'), $taskChecksums)
     Write-Output "Release assets: $taskAssets"
     Write-Output "ZIP: $taskZip"
 } finally { Pop-Location }

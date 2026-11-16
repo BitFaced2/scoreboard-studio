@@ -6,17 +6,15 @@ The desktop interface uses Total Media Sports branding, with the supplied logo e
 
 ## Run
 
-Download the Windows x64 ZIP from [GitHub Releases](https://github.com/BitFaced2/scoreboard-studio/releases). Choose **Extract All**, open the extracted folder, and launch `ScoreboardStudio.exe`. Keep its `samples` folder alongside it. `START-HERE.txt` contains launch, image setup, and vMix instructions. The portable preview bundles .NET; NDI still requires a runtime installed separately or with vMix. Preview builds are unsigned.
+Download the Windows ZIP from [GitHub Releases](https://github.com/BitFaced2/scoreboard-studio/releases), extract it, and open `ScoreboardStudio.exe`. The self-contained build includes .NET. The app starts with no source or fields, and outputs stopped. The illustrated PDF user guide is included in the ZIP and available as a separate release download.
 
-Open `artifacts/ScoreboardStudio/ScoreboardStudio.exe` after publishing. The self-contained build includes .NET; it does not require a separate .NET installation. It starts with no source and no fields. Select an NDI source and click **Connect**, open a scoreboard image, or load a saved setup. Outputs start **off**.
+Choose **Load image or video** to select your own PNG, JPEG, BMP or recorded video. There is no built-in demo or sample-media button, and release packages contain no sample media or layouts. Use **Pause / Play**, **Restart**, and **Loop video** for recordings. Audio is muted. Windows supplies the video decoder; H.264 MP4 is the recommended format. Other offered video containers depend on the codecs installed on the machine. Frames are fitted within 1280 x 720 while preserving aspect ratio for processing.
 
-The public repository includes a ten-field example layout. The real reference photo and original planning images are excluded. To use **Open real scoreboard sample**, place the matching reference photo at `samples/real-scoreboard/scoreboard.png` before building. The sample button is available only when that photo is present. For your own photos, use **Open scoreboard image** and create or adjust the field boxes.
+For a live feed, select an NDI source and click **Connect**. The dropdown lists NDI feeds only; USB cameras and capture cards must first be exposed as NDI through vMix or another sender. An empty list does not affect local file playback. NDI input/output requires an installed runtime; local image/video processing does not. The app checks the standard vMix runtime location automatically.
 
-When present, sample files are copied to the `samples` folder next to the executable; keep that folder with the app. Saving the sample prompts for a new setup filename. Image setups remember a relative image path, so loading them restores the still image as well as the field settings.
+When a source has no existing fields, the app automatically detects the displays and creates editable boxes. Adjust or name them as needed, or load your own saved layout. Existing fields and saved layouts are retained rather than overwritten. Setups remember a relative image or video path so they can restore the source. Media is referenced, not embedded: copy it along with the setup when moving computers. Loading a setup never starts outputs automatically. A paused video, or a video that reaches the end with Loop disabled, holds its last frame until you resume or restart.
 
-The v0.2.1 presentation ZIP includes the reference photo and prepared layout, the TMS PDF user guide, and the recorded-clock setup in `samples/recorded-clock`. **Open real scoreboard sample** works immediately. The photo remains excluded from Git source history. The built-in synthetic demo has been removed.
-
-To test your recorded clip, play it in vMix and send its full frame over NDI, then load `samples/recorded-clock/basketball-clocks.scoreboard.json` and connect to that source. Bring the recording separately; video files are not included in the download. The sample's `PLAYBACK-NOTES.txt` explains the workflow.
+The TMS PDF user guide covers the internal workflow. Source test fixtures in `samples` are developer checks and are not included in the application package.
 
 ## Angled cameras
 
@@ -26,9 +24,11 @@ This is a four-point projective correction with bilinear pixel sampling. It stra
 
 The correction is fixed, not camera tracking. If the camera moves, realign it. It does not correct lens distortion or recover detail missing from the camera image.
 
+Straightening retains existing field boxes; cutting a display out of the view does not delete its fields. Select unwanted fields under **Your fields** and click **Remove selected field**, then resize the remaining boxes. Alternatively, use **Auto-detect fields → Use suggestions** to rebuild the field list for the corrected image. Save the updated setup afterward.
+
 ## Bright digits on a glowing panel
 
-Use **Bright colors** for saturated red/amber LEDs against a dark background. Use **White highlights** when digit cores are white but the surrounding panel has a strong colored glow, as in the supplied photo. Adjust cutoff and softness per field. The real-photo sample uses the latter mode; its crops and settings were prepared manually and are not an assertion that automatic detection understands each field.
+Use **Bright colors** for saturated red/amber LEDs against a dark background. Use **White highlights** when digit cores are white but the surrounding panel has a strong colored glow, as in an overexposed scoreboard photo. Adjust cutoff and softness per field. Review each crop manually; automatic detection does not understand field meanings.
 
 Automatic detection has its own **Look for** mode and cutoff. White-highlight mode first looks for red/amber display panels and separated digit groups, then falls back to bright-region grouping if too few panels are found. These are editable suggestions: labels, indicators, glare, or adjacent windows can still create unwanted/merged boxes. Accepted suggestions inherit the detection mode and cutoff.
 
@@ -38,10 +38,10 @@ For NDI input and output, an NDI runtime must be installed. The app checks the s
 
 1. Make the scoreboard camera feed available as an NDI output in vMix. The camera feed must already have reached the studio; this app does not transport the remote game's feed to the studio.
 2. Choose that NDI source in the left sidebar and click **Connect**. Discovery refreshes periodically; **Refresh** scans immediately.
-3. If the camera is angled, use **Straighten camera** first. Draw fields manually, or click **Auto-detect fields**. Amber boxes are suggestions only. **Use suggestions** replaces the field list; **Undo detection** restores the previous list. Name each field yourself.
+3. If the camera is angled, use **Straighten camera** first. Fields are created automatically when the source has no existing layout. Draw missing fields manually, or click **Auto-detect fields** to rescan. Amber boxes are suggestions only. **Use suggestions** replaces the field list; **Undo detection** restores the previous list. Name each field yourself.
 4. Move a field by dragging inside its box; resize from its lower-right square. Exact crop positions are also editable as percentages. Leave room for every possible digit, including scores that gain a digit.
 5. Select a field and use **Cleanup** to compare its original crop with the transparent result. Adjust cutoff, softness, brightness, color, thickness, smoothing, and speckle removal. Settings are independent per field.
-6. Save your setup. Layouts include perspective, field names, normalized crops, cleanup settings, output enablement, and the source name or still-image path. They do not embed images or GTZIP artwork. Loading a saved NDI layout requires connecting the source again, and never starts outputs automatically.
+6. Save your setup. Layouts include perspective, field names, normalized crops, cleanup settings, output enablement, and the source name or image/video path. They do not embed media or GTZIP artwork. Loading a saved NDI layout requires connecting the source again, and never starts outputs automatically.
 7. Click **Start NDI outputs**. In vMix, add each `Scoreboard - <field name>` NDI source as an input and position those inputs as layers over your existing scorebug/GT title. The machine name is added by NDI. Still-image outputs explicitly contain `STILL` in their names.
 8. Use **Lock for live** to protect source/crop/cleanup controls. You can still stop outputs. Unlock to edit again.
 
@@ -55,7 +55,7 @@ If no new NDI frame arrives for 1.5 seconds, the app displays **NO SIGNAL**, dim
 - Up to 24 fields; independent NDI streams at a target of 30 fps. No audio. Throughput depends on crop size, processing controls, network, and available CPU. Source frames may be skipped to keep latency bounded.
 - Output widths are padded to an even number of pixels for NDI compatibility. Alpha is straight, not premultiplied.
 - GTZIP files stay in vMix. There is no GTZIP importer, scorebug renderer, automatic vMix layer setup, or remote venue transport in this version.
-- Image import supports PNG/JPEG/BMP for setup. Recorded video-file playback is not implemented.
+- Image import supports PNG/JPEG/BMP. Local video uses Windows media decoding, with playback controls and automatic looping. Unsupported codecs report an error; no decoder package or FFmpeg executable is bundled.
 - This build is a portable application. A signed EXE/MSI installer, optional desktop shortcut, and installer upgrade flow remain release work.
 
 ## Development
@@ -71,10 +71,10 @@ dotnet run --project tests/ScoreboardStudio.Checks -c Release
 dotnet run --project tests/ScoreboardStudio.Checks -c Release -- --ndi
 dotnet run --project tests/ScoreboardStudio.Checks -c Release -- --image samples/real-scoreboard/scoreboard.png samples/real-scoreboard/real-scoreboard.scoreboard.json artifacts/real-scoreboard-checks
 powershell -ExecutionPolicy Bypass -File scripts/Build.ps1
-powershell -ExecutionPolicy Bypass -File scripts/Package-Release.ps1 -IncludeReferencePhoto -VerifyNdi
+powershell -ExecutionPolicy Bypass -File scripts/Package-Release.ps1 -VerifyReferencePhoto -VerifyNdi
 ```
 
-The normal console checks require neither NDI nor the reference photo. `--ndi` additionally exercises an installed runtime with actual discovery, receive, cleaned output, alpha, signal loss, and recovery. `--image` requires the optional reference photo and produces a comparison sheet, detection overlay, and perspective example. The WPF executable also supports `--smoke-test <output-directory>` to exercise field selection/rename/crop/cleanup and render the work areas to PNG. When the reference photo is present, it also loads the real sample and verifies perspective apply/cancel/reset. These tests publish temporary local NDI sources only when `--ndi` is explicitly used.
+The normal console checks require neither NDI nor the reference photo. `--ndi` additionally exercises an installed runtime with actual discovery, receive, cleaned output, alpha, signal loss, and recovery. `--image` requires the optional reference photo and produces a comparison sheet, detection overlay, and perspective example. The WPF executable also supports `--smoke-test <output-directory>` to exercise field selection/rename/crop/cleanup and render the work areas to PNG. Pass `--test-layout <photo-layout.json>` to supply a photo fixture for field editing and perspective apply/cancel/reset. `--video-smoke-test <directory> --video-file <clip.mp4> --test-layout <layout.json> --ndi` checks direct video decoding, pause/restart/loop, persistence, NDI output, source switching and invalid media; omit `--ndi` when no runtime is available. These tests publish temporary local NDI sources only when `--ndi` is explicitly used.
 
 The `Core` project contains pixels, detection, layout persistence, the worker pipeline, and the NDI native bindings. The `App` project is the WPF desktop editor. `Checks` is a dependency-free console verification harness.
 

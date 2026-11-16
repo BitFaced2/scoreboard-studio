@@ -160,8 +160,16 @@
               <Button Content="Connect" Style="{StaticResource Primary}" Click="ConnectClick" />
             </StackPanel>
             <TextBlock x:Name="DiscoveryText" Text="Scanning for NDI sources…" TextWrapping="Wrap" Foreground="{StaticResource Muted}" FontSize="11" Margin="0,10,0,12" />
-            <Button Content="Open scoreboard image" Click="ImageClick" Margin="0,0,0,7" />
-            <Button x:Name="RealSampleButton" Content="Open real scoreboard sample" Click="RealSampleClick" Margin="0,0,0,16" />
+            <Button Content="Load image or video" Click="LoadMediaClick" Margin="0,0,0,10" />
+            <StackPanel x:Name="VideoControls" Visibility="Collapsed" Margin="0,0,0,10">
+              <TextBlock x:Name="MediaFileLabel" Foreground="{StaticResource Muted}" TextTrimming="CharacterEllipsis" Margin="0,0,0,7" />
+              <StackPanel Orientation="Horizontal">
+                <Button x:Name="PauseVideoButton" Content="Pause" Click="PauseVideoClick" />
+                <Button Content="Restart" Click="RestartVideoClick" />
+              </StackPanel>
+              <CheckBox x:Name="LoopVideo" Content="Loop video" IsChecked="True" Click="LoopVideoClick" />
+              <TextBlock x:Name="VideoTime" Foreground="{StaticResource Muted}" FontSize="11" />
+            </StackPanel>
             <Border Height="1" Background="#2A3542" Margin="0,0,0,16" />
           </StackPanel>
           <StackPanel DockPanel.Dock="Bottom" x:Name="FieldActions" Margin="0,12,0,0">
@@ -226,7 +234,7 @@
                 </Viewbox>
                 <StackPanel x:Name="EmptySourcePanel" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="24" MaxWidth="350" IsHitTestVisible="False">
                   <TextBlock Text="Connect your scoreboard" FontSize="24" FontWeight="SemiBold" TextWrapping="Wrap" TextAlignment="Center" />
-                  <TextBlock Text="Select an NDI source on the left and click Connect, or open a scoreboard image for setup." Foreground="{StaticResource Muted}" TextWrapping="Wrap" TextAlignment="Center" Margin="0,12,0,0" />
+                  <TextBlock Text="Select an NDI source and click Connect, or use Load image or video to open your own footage." Foreground="{StaticResource Muted}" TextWrapping="Wrap" TextAlignment="Center" Margin="0,12,0,0" />
                 </StackPanel>
                 </Grid>
               </Border>
@@ -309,7 +317,7 @@
           </TabItem>
         </TabControl>
         <Border Grid.Row="2" Background="#151C25" CornerRadius="6" Margin="0,12,0,0" Padding="12">
-          <TextBlock x:Name="Notice" Text="Choose an NDI source or open a scoreboard image to begin. You can also load a saved setup." TextWrapping="Wrap" Foreground="{StaticResource Muted}" />
+          <TextBlock x:Name="Notice" Text="Connect an NDI source, load your image or video, or open a saved setup." TextWrapping="Wrap" Foreground="{StaticResource Muted}" />
         </Border>
       </Grid>
       <Border Grid.Column="4" Background="{StaticResource Panel}" CornerRadius="8" Padding="16">

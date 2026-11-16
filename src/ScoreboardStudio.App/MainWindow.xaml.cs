@@ -26,6 +26,8 @@ public partial class MainWindow : Window
     private string kind = "None", setupName = "Untitled setup";
     private string? savePath;
     private string? stillPath;
+    private string? videoPath;
+    private VideoFileSource? video;
     private PerspectiveSettings perspective = new();
     private PerspectiveSettings? perspectiveDraft;
     private int cornerDragging = -1;
@@ -42,8 +44,6 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-        RealSampleButton.IsEnabled = File.Exists(System.IO.Path.Combine(AppContext.BaseDirectory, "samples", "real-scoreboard", "scoreboard.png"));
-        RealSampleButton.ToolTip = RealSampleButton.IsEnabled ? "Open the reference photo and its prepared fields" : "Optional reference photo is not included. Use Open scoreboard image for your own photo.";
         FieldList.ItemsSource = fields;
         OutputCards.ItemsSource = cards;
         ready = true;
@@ -58,7 +58,7 @@ public partial class MainWindow : Window
         try
         {
             bool available = await Task.Run(NdiRuntime.Initialize);
-            RuntimeStatus.Text = available ? "NDI READY   •   Local processing   •   No OCR" : "NDI UNAVAILABLE   •   Image setup is available";
+            RuntimeStatus.Text = available ? "NDI READY   •   Local processing   •   No OCR" : "NDI UNAVAILABLE   •   Local image and video files are available";
             RuntimeStatus.ToolTip = NdiRuntime.LibraryPath ?? NdiRuntime.Status;
             if (available) discovery = new NdiDiscovery();
             RefreshSources();
@@ -66,11 +66,13 @@ public partial class MainWindow : Window
             var args = Environment.GetCommandLineArgs();
             int index = Array.IndexOf(args, "--smoke-test");
             if (index >= 0 && args.Length > index + 1) await SmokeTest(args[index + 1]);
+            int videoIndex = Array.IndexOf(args, "--video-smoke-test");
+            if (videoIndex >= 0 && args.Length > videoIndex + 1) await VideoSmokeTest(args[videoIndex + 1]);
         }
         catch (Exception ex) { Notice.Text = ex.Message; }
     }
 
-    private void PushPlan() => engine.Configure(new(kind, source, still, fields.Select(f => f.Snapshot()).ToArray(), output, generation, perspective with { }));
+    private void PushPlan() => engine.Configure(new(kind, source, still, fields.Select(f => f.Snapshot()).ToArray(), output, generation, perspective with { }, video));
     private void Changed()
     {
         dirty = true;
@@ -91,7 +93,7 @@ public partial class MainWindow : Window
     }
     private void RefreshSources()
     {
-        if (discovery is null) { DiscoveryText.Text = "NDI runtime unavailable. Open a scoreboard image for setup, or install the runtime to connect video."; return; }
+        if (discovery is null) { DiscoveryText.Text = "Load an image or video, or install the NDI runtime to connect a live feed."; return; }
         try
         {
             var selected = (SourceCombo.SelectedItem as NdiSource)?.Name;
@@ -104,7 +106,18 @@ public partial class MainWindow : Window
     }
     private void RefreshPreview()
     {
+        if (video is not null)
+        {
+            PauseVideoButton.Content = video.IsPlaying ? "Pause" : "Play";
+            VideoTime.Text = $"{video.Position:mm\\:ss} / {video.Duration:mm\\:ss}";
+        }
         var preview = engine.Preview;
+        if(automaticDetectionPending && preview.Generation==generation && preview.Healthy && preview.Source is not null && fields.Count==0 && !locked && !EditingPerspective)
+        {
+            automaticDetectionPending=false;
+            _=DetectLoadedSource(generation,detectionRevision);
+        }
+        EmptyFieldsText.Text=preview.Healthy ? "Fields are detected automatically. Adjust the boxes or draw any missing field." : "Load an image or video, or connect an NDI source. Fields will be detected automatically.";
         SignalText.Text = preview.Status;
         SignalBanner.Background = Brush(kind == "None" ? "#17304A" : preview.Healthy ? kind == "NDI" ? "#173D32" : "#40331E" : "#4C2429");
         SignalText.Foreground = Brush(kind == "None" ? "#A8D6FF" : preview.Healthy ? kind == "NDI" ? "#8EF2D0" : "#F2CA83" : "#FFB1B9");
@@ -140,6 +153,9 @@ public partial class MainWindow : Window
 
     private void SwitchSource(string newKind, NdiSource? newSource = null, VideoFrame? image = null)
     {
+        CancelAutomaticDetection();
+        automaticDetectionPending=newKind!="None" && fields.Count==0;
+        video?.Dispose(); video = null; videoPath = null; VideoControls.Visibility = Visibility.Collapsed;
         output = false; OutputButton.Content = "Start NDI outputs";
         kind = newKind; source = newSource; still = image; generation++;
         stillPath = null;
@@ -147,7 +163,7 @@ public partial class MainWindow : Window
         suggestions.Clear(); AcceptDetection.Visibility = Visibility.Collapsed; beforeDetection = null; UndoDetection.Visibility = Visibility.Collapsed;
         drawing = false; DrawButton.Content = "+ Draw a field";
         SyncFields(); Changed();
-        Notice.Text = newKind == "NDI" ? "Source connected. Review every crop before starting outputs." : newKind == "Image" ? "Still image mode is for setup. Its outputs are labeled STILL." : "Choose an NDI source or open a scoreboard image to begin.";
+        Notice.Text = newKind == "NDI" ? "Source connected. Review every crop before starting outputs." : newKind == "Image" ? "Image loaded. Draw fields or load a saved setup." : "Video loaded. Draw fields or load a saved setup.";
         if (perspective.Enabled) Notice.Text += " Perspective correction is retained; review its corners for this source.";
     }
     private void RefreshClick(object sender, RoutedEventArgs e) => RefreshSources();
@@ -157,18 +173,34 @@ public partial class MainWindow : Window
         if (SourceCombo.SelectedItem is NdiSource chosen) SwitchSource("NDI", chosen);
         else Notice.Text = "Select an NDI source first. Refresh to scan again.";
     }
-    private void ImageClick(object sender, RoutedEventArgs e)
+    private void LoadMediaClick(object sender, RoutedEventArgs e)
     {
         if (locked) return;
-        var dialog = new OpenFileDialog { Filter = "Scoreboard images|*.png;*.jpg;*.jpeg;*.bmp", Title = "Open a scoreboard image for setup" };
+        var dialog = new OpenFileDialog { Filter = "Images and videos|*.png;*.jpg;*.jpeg;*.bmp;*.mp4;*.m4v;*.mov;*.wmv;*.avi|Images|*.png;*.jpg;*.jpeg;*.bmp|Videos|*.mp4;*.m4v;*.mov;*.wmv;*.avi", Title = "Load image or video" };
         if (dialog.ShowDialog(this) != true) return;
         try
         {
-            SwitchSource("Image", image: LoadImage(dialog.FileName));
-            stillPath = dialog.FileName;
+            LoadMedia(dialog.FileName);
         }
-        catch (Exception ex) { Notice.Text = "Could not open image: " + ex.Message; }
+        catch (Exception ex) { Notice.Text = "Could not load file: " + ex.Message; }
     }
+    private void LoadMedia(string path)
+    {
+        path = System.IO.Path.GetFullPath(path);
+        if (new[] { ".png", ".jpg", ".jpeg", ".bmp" }.Contains(System.IO.Path.GetExtension(path).ToLowerInvariant()))
+        { SwitchSource("Image", image: LoadImage(path)); stillPath = path; }
+        else
+        {
+            var next = new VideoFileSource(path);
+            SwitchSource("Video"); video = next; videoPath = path;
+            video.Loop = LoopVideo.IsChecked == true;
+            MediaFileLabel.Text = System.IO.Path.GetFileName(path); MediaFileLabel.ToolTip = path;
+            VideoControls.Visibility = Visibility.Visible; PushPlan();
+        }
+    }
+    private void PauseVideoClick(object sender, RoutedEventArgs e) { if (!locked) video?.TogglePause(); }
+    private void RestartVideoClick(object sender, RoutedEventArgs e) { if (!locked) video?.Restart(); }
+    private void LoopVideoClick(object sender, RoutedEventArgs e) { if (!locked && video is not null) video.Loop = LoopVideo.IsChecked == true; }
     private void FieldSelected(object sender, SelectionChangedEventArgs e)
     {
         if (!ready) return;
@@ -259,6 +291,7 @@ public partial class MainWindow : Window
     {
         if (locked || engine.Preview.Source is not { } frame || !engine.Preview.Healthy) { Notice.Text = "A healthy source is needed to detect fields."; return; }
         int sourceGeneration = generation;
+        CancelAutomaticDetection();
         DetectButton.IsEnabled = false; DetectionHint.Text = "Looking for groups of bright digits…";
         try
         {
@@ -296,7 +329,8 @@ public partial class MainWindow : Window
     private void DrawClick(object sender, RoutedEventArgs e)
     {
         if (locked) return;
-        if (engine.Preview.Source is null || !engine.Preview.Healthy) { Notice.Text = "Connect a video source or open a scoreboard image before drawing fields."; return; }
+        if (engine.Preview.Source is null || !engine.Preview.Healthy) { Notice.Text = "Connect a source or load an image or video before drawing fields."; return; }
+        CancelAutomaticDetection();
         if (fields.Count >= 24) { Notice.Text = "This version supports up to 24 fields."; return; }
         drawing = !drawing; DrawButton.Content = drawing ? "Cancel drawing" : "+ Draw a field";
         WorkspaceTabs.SelectedIndex = 0; BoxCanvas.Cursor = drawing ? Cursors.Cross : Cursors.Arrow;
@@ -434,6 +468,7 @@ public partial class MainWindow : Window
             setupName = System.IO.Path.GetFileName(savePath).Replace(".scoreboard.json", "");
             new Layout { Name = setupName, SourceName = source?.Name, Perspective = perspective with { },
                 ImagePath = stillPath is null ? null : System.IO.Path.GetRelativePath(System.IO.Path.GetDirectoryName(savePath)!, stillPath),
+                VideoPath = videoPath is null ? null : System.IO.Path.GetRelativePath(System.IO.Path.GetDirectoryName(savePath)!, videoPath),
                 Fields = fields.Select(f => f.Snapshot()).ToList() }.Save(savePath);
             dirty = false; SetupTitle.Text = setupName + " • Saved"; Notice.Text = "Setup saved: " + savePath; return true;
         }
@@ -466,7 +501,7 @@ public partial class MainWindow : Window
     private void WindowClosing(object? sender, CancelEventArgs e)
     {
         if (!ConfirmDiscard()) { e.Cancel = true; return; }
-        timer.Stop(); discovery?.Dispose(); engine.Dispose();
+        CancelAutomaticDetection();timer.Stop(); video?.Dispose(); discovery?.Dispose(); engine.Dispose();
     }
 
     private async Task SmokeTest(string directory)
@@ -480,12 +515,21 @@ public partial class MainWindow : Window
             DrawClick(this, new());
             if (drawing || fields.Count != 0) throw new Exception("Drawing was allowed without a source.");
             CaptureWindow(System.IO.Path.Combine(directory,"startup.png"));
-            if (!RealSampleButton.IsEnabled)
+            var testArgs = Environment.GetCommandLineArgs();
+            int fixtureIndex = Array.IndexOf(testArgs,"--test-layout");
+            string? fixturePath = fixtureIndex >= 0 && testArgs.Length > fixtureIndex+1 ? testArgs[fixtureIndex+1] : null;
+            if (fixturePath is null)
             {
                 File.WriteAllText(System.IO.Path.Combine(directory, "ui-checks.txt"), "PASS: empty startup, no source or outputs, disabled inspector, drawing blocked. SKIP: optional photo fixture is absent.\n");
                 return;
             }
-            OpenLayout(System.IO.Path.Combine(AppContext.BaseDirectory,"samples","real-scoreboard","real-scoreboard.scoreboard.json"),sample:true);
+            var fixture=Layout.Load(fixturePath);
+            string photoPath=System.IO.Path.GetFullPath(fixture.ImagePath!,System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(fixturePath))!);
+            LoadMedia(photoPath);
+            for(int i=0;i<100 && fields.Count==0;i++)await Task.Delay(100);
+            if(fields.Count==0)throw new Exception("Image load did not automatically create fields.");
+            await Task.Delay(200);RefreshPreview();UpdateLayout();CaptureWindow(System.IO.Path.Combine(directory,"automatic-image-fields.png"));
+            OpenLayout(fixturePath);
             for (int i = 0; i < 100 && engine.Preview.Fields.Count != 10; i++) await Task.Delay(100);
             if (engine.Preview.Fields.Count != 10) throw new Exception("Photo did not produce ten cleaned fields.");
             var originalField = fields[1].Snapshot();
@@ -509,7 +553,7 @@ public partial class MainWindow : Window
             LiveClick(this, new());
             if (Inspector.IsEnabled || SourceControls.IsEnabled || BoxCanvas.Children.Count != 0) throw new Exception("Live lock did not protect editing.");
             LiveClick(this, new());
-            OpenLayout(System.IO.Path.Combine(AppContext.BaseDirectory,"samples","real-scoreboard","real-scoreboard.scoreboard.json"),sample:true);
+            OpenLayout(fixturePath);
             for(int i=0;i<100 && engine.Preview.Fields.Count!=10;i++) await Task.Delay(100);
             if(kind!="Image" || fields.Count!=10 || IsolationMode.SelectedIndex!=1 || output) throw new Exception("Real scoreboard sample did not load as a stopped still image with white-highlight cleanup.");
             WorkspaceTabs.SelectedIndex=1;await Task.Delay(150);RefreshPreview();UpdateLayout();

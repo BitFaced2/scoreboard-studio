@@ -1,77 +1,67 @@
-TMS SCOREBOARD STUDIO - PORTABLE WINDOWS PREVIEW
+TMS SCOREBOARD STUDIO 0.3.1 - INTERNAL USE
 
-Version 0.2.1: TMS branding, source-first startup, no built-in demo mode.
-The included PDF user guide covers setup, cleanup, vMix and troubleshooting.
+START
 
-START THE APP
+Extract the portable ZIP and open ScoreboardStudio.exe. The Windows x64 build
+bundles .NET; no separate .NET installation is needed. The app starts with no
+source or fields, and outputs stopped.
 
-1. Download ScoreboardStudio-...-win-x64.zip from GitHub Releases.
-   The automatically generated Source code downloads are for developers.
-2. Right-click the ZIP and choose Extract All. Keep the extracted folder intact.
-3. Open ScoreboardStudio.exe inside that folder. No installer or separate .NET
-   installation is needed. This build is for 64-bit Windows.
+LOAD YOUR FOOTAGE
 
-This preview is unsigned. Windows may display an unknown-publisher warning.
-Official downloads: https://github.com/BitFaced2/scoreboard-studio/releases
-The release's SHA256SUMS.txt identifies the published ZIP's checksum.
+Click Load image or video and choose your own scoreboard photo or recording.
+No samples are included. Images: PNG, JPEG or BMP. H.264 MP4 is recommended
+for video; other video formats depend on the codecs available in Windows.
+Recordings play automatically with audio muted. Pause / Play, Restart and
+Loop video controls appear below the filename. Pausing holds the last frame.
+If looping is off, the final frame remains until you restart the recording.
 
-CONNECT A SOURCE OR OPEN AN IMAGE
+Fields are detected and created automatically when no fields exist yet.
+Review and name the boxes, or Load setup to restore your own crops and cleanup.
+Save setup remembers the selected image or video by relative path. Copy the
+media with the setup when moving computers. Files are not embedded in layouts.
 
-The app starts with no source and no fields. Select an NDI source and click
-Connect, open a scoreboard image, or load a saved setup. Select a field, then
-choose Cleanup to compare its original digits with the transparent result.
-Image setup does not require an NDI runtime.
+PREPARE THE FIELDS
 
-The presentation package includes a photo and ten prepared fields. Choose
-Open real scoreboard sample to load them. It is a still image, so its clock
-does not move. Keep the samples folder next to the executable. Save setup or
-Save as saves your own configuration.
+For an angled camera, use Fields > Straighten camera, place the four numbered
+corners, choose the corrected size and click Apply. Review the automatically created boxes, leaving room for changing digits.
+Name each field and draw a box around any field that was missed.
+Auto-detect fields provides suggestions you can review and adjust.
 
-For an angled camera, choose Fields > Straighten camera, place the four corners
-around the board, and click Apply. Review field boxes after straightening.
-Automatic detection supplies suggestions that need review and naming.
+Straightening does not delete fields. To remove one, select it under Your
+fields and click Remove selected field at the bottom left. After changing
+the view, resize the remaining boxes or Auto-detect fields > Use suggestions
+to rebuild them. Save setup when finished.
 
-USE THE FIELDS IN VMIX
+Open Cleanup and compare the original and cleaned pixels. Use Bright colors
+for red/amber LEDs on dark panels, or White highlights for white digit cores
+surrounded by colored glow. Adjust Background cutoff and Edge softness.
 
-NDI input/output requires an installed 64-bit NDI runtime. The app can use the
-runtime in a standard vMix installation. NDI READY appears at the bottom when
-one is available. The runtime and vMix are not included in this package.
+SEND TO VMIX
 
-1. Make the scoreboard camera available as an NDI source from vMix.
-2. In Scoreboard Studio, select that source and click Connect.
-3. Set up the field boxes and cleanup, then click Start NDI outputs.
-4. In vMix, use Add Input > NDI to add each Scoreboard - <field name> input.
-5. Position those inputs as layers over your scorebug. They include transparency.
+1. For a live source, choose an NDI feed and click Connect. For a recording,
+   use Load image or video directly; vMix playback is not required.
+2. Enable the desired fields and click Start NDI outputs.
+3. In vMix, Add Input > NDI for each Scoreboard - <field name> source.
+4. Position those inputs as layers over your scorebug. They include alpha.
+5. Save the vMix preset separately. Use Lock for live to protect app settings.
 
-Still-image outputs contain STILL in their names. NDI adds your computer name to the source names. Outputs start stopped.
-Lock for live protects editing. Opening the perspective editor stops outputs;
-start them again when ready.
+The source dropdown lists NDI feeds only. Cameras and capture cards must be
+added in vMix and sent over NDI first. An empty dropdown is normal when using
+a local image or video and does not affect file playback.
 
-TEST WITH YOUR RECORDED CLIP
-
-Bring your recording separately; no videos are included in this download.
-Play and loop it in vMix, then send the full video frame over NDI. Load
-samples/recorded-clock/basketball-clocks.scoreboard.json in Scoreboard Studio
-and connect to that NDI source. See that folder's PLAYBACK-NOTES.txt for details.
+An installed 64-bit NDI runtime is required for NDI input/output. A standard
+vMix installation can supply it; no NDI runtime or vMix is bundled. Local
+image/video processing works without NDI. Still-image streams include STILL
+in their names. NDI also includes the computer name.
 
 IF SOMETHING DOES NOT WORK
 
-- NDI unavailable: ensure vMix/NDI runtime is installed. A custom runtime can be
-  located with SCOREBOARD_NDI_RUNTIME set to its 64-bit DLL path before launch.
-  Photo cleanup remains available without NDI.
-- No NDI sources: confirm the source is sending NDI, then click Refresh. Check
-  the intended network and that firewall access allows the apps to communicate.
-- Missing photo: extract the entire ZIP, including its samples subfolder.
-- NO SIGNAL: outputs clear after 1.5 seconds without new frames and resume when
-  video returns. Repeated frozen frames from a camera are not detected.
-- Red glow survives: try White highlights and raise Background cutoff.
+- Video will not open: use a Windows-supported H.264 MP4 with a video track.
+- No NDI sources: enable NDI at the sender, then Refresh. Check connectivity.
+- Missing media: use Load image or video to locate it, then save your setup.
+- NO SIGNAL: check the sending source. After 1.5 seconds without new NDI
+  frames, fields clear to transparency and resume when frames return.
+- Glow remains: raise cutoff or try White highlights. If digits vanish,
+  lower the cutoff and check the original crop for missing detail.
 
-PREVIEW STATUS
-
-This is a prototype, not a signed installer or a finished broadcast product.
-It has been checked with synthetic video, a real still photo, geometry tests,
-and local NDI transmission. A live-game camera and the full vMix scorebug
-workflow still need validation. No OCR, cloud account, or model download is used.
-
-More details: README.md in this folder.
-Project and issues: https://github.com/BitFaced2/scoreboard-studio
+See the included PDF guide for illustrated operating instructions.

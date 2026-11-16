@@ -61,6 +61,7 @@ public sealed class Layout
     public string Name { get; set; } = "Untitled setup";
     public string? SourceName { get; set; }
     public string? ImagePath { get; set; }
+    public string? VideoPath { get; set; }
     public PerspectiveSettings Perspective { get; set; } = new();
     public List<ScoreField> Fields { get; set; } = [];
     private static readonly JsonSerializerOptions Options = new() { WriteIndented = true };
@@ -78,6 +79,8 @@ public sealed class Layout
         var layout = JsonSerializer.Deserialize<Layout>(File.ReadAllText(path), Options)
             ?? throw new InvalidDataException("The setup file is empty.");
         if (layout.Version != 1) throw new InvalidDataException("This setup version is not supported.");
+        if (!string.IsNullOrWhiteSpace(layout.ImagePath) && !string.IsNullOrWhiteSpace(layout.VideoPath))
+            throw new InvalidDataException("A setup cannot reference both an image and a video.");
         if (layout.Perspective is null || !layout.Perspective.IsValid(out var reason))
             throw new InvalidDataException("The saved perspective correction is invalid.");
         if (layout.Fields is null || layout.Fields.Count > 24) throw new InvalidDataException("A setup can contain up to 24 fields.");

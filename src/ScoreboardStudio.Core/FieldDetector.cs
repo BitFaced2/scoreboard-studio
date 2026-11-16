@@ -3,6 +3,17 @@ namespace ScoreboardStudio.Core;
 // Bright-region grouping only. No digit recognition, model, or external service.
 public static class FieldDetector
 {
+    public sealed record Detection(List<Crop> Regions, string Isolation, int Threshold);
+
+    public static Detection DetectAutomatic(VideoFrame frame)
+    {
+        var panels = DetectWarmPanels(frame, 170);
+        if (panels.Count >= 2) return new(panels, "White highlights", 170);
+        var leds = DetectRegions(frame, 125, "Bright colors", true);
+        if (leds.Count > 0) return new(ReserveDigitSpace(frame, leds), "Bright colors", 125);
+        return new(DetectRegions(frame, 170, "White highlights", false), "White highlights", 170);
+    }
+
     public static List<Crop> Detect(VideoFrame frame, int threshold = 130, string isolation = "Bright colors")
     {
         if (isolation == "White highlights")
@@ -10,12 +21,24 @@ public static class FieldDetector
             var panels = DetectWarmPanels(frame, threshold);
             if (panels.Count >= 2) return panels;
         }
+        if (isolation == "Bright colors")
+        {
+            var leds = DetectRegions(frame, threshold, isolation, true);
+            if (leds.Count > 0) return leds;
+        }
+        return DetectRegions(frame, threshold, isolation, false);
+    }
+
+    private static List<Crop> DetectRegions(VideoFrame frame, int threshold, string isolation, bool warmOnly)
+    {
         int step = Math.Max(1, frame.Width / 640), w = frame.Width / step, h = frame.Height / step;
         var mask = new bool[w * h];
         for (int y = 0; y < h; y++) for (int x = 0; x < w; x++)
         {
             int p = (y * step * frame.Width + x * step) * 4;
-            mask[y * w + x] = frame.Pixels[p + 3] > 32 && PixelIsolation.Level(frame.Pixels[p], frame.Pixels[p + 1], frame.Pixels[p + 2], isolation) >= threshold;
+            int b=frame.Pixels[p],g=frame.Pixels[p+1],r=frame.Pixels[p+2];
+            mask[y * w + x] = frame.Pixels[p + 3] > 32 && PixelIsolation.Level((byte)b,(byte)g,(byte)r,isolation) >= threshold
+                && (!warmOnly || r-g>15 && r-b>45);
         }
         // Integral image makes rectangular dilation O(pixels), independent of radius.
         var integral = new int[(w + 1) * (h + 1)];
@@ -53,6 +76,25 @@ public static class FieldDetector
             if (lit < 12 || height < Math.Max(5, h / 60) || width < 3 || width > w * .9 || height > h * .6) continue;
             result.Add(new Crop((minX - 4.0) / w, (minY - 4.0) / h, (width + 8.0) / w, (height + 8.0) / h).Clamp());
         }
+        // A narrow digit such as 1 can be separated from its neighbors by more
+        // than the dilation radius. Join aligned fragments without spanning the
+        // larger gaps between neighboring displays.
+        bool merged;
+        do
+        {
+            merged=false;
+            for(int a=0;a<result.Count && !merged;a++) for(int b=a+1;b<result.Count;b++)
+            {
+                var l=result[a].X<result[b].X?result[a]:result[b];
+                var r=result[a].X<result[b].X?result[b]:result[a];
+                double gap=(r.X-l.X-l.Width)*frame.Width;
+                double overlap=(Math.Min(l.Y+l.Height,r.Y+r.Height)-Math.Max(l.Y,r.Y))*frame.Height;
+                double minHeight=Math.Min(l.Height,r.Height)*frame.Height,maxHeight=Math.Max(l.Height,r.Height)*frame.Height;
+                if(gap<0 || gap>Math.Min(minHeight*.6,frame.Width*.045) || overlap<minHeight*.7 || maxHeight>minHeight*1.6)continue;
+                double top=Math.Min(l.Y,r.Y),bottom=Math.Max(l.Y+l.Height,r.Y+r.Height);
+                result[a]=new(l.X,top,r.X+r.Width-l.X,bottom-top);result.RemoveAt(b);merged=true;break;
+            }
+        } while(merged);
         return result.OrderBy(r => Math.Round(r.Y * 10)).ThenBy(r => r.X).Take(24).ToList();
 
         void Visit(int x, int y)
@@ -62,6 +104,37 @@ public static class FieldDetector
             if (!connected[i]) return;
             connected[i] = false; queue.Enqueue(i);
         }
+    }
+
+    private static List<Crop> ReserveDigitSpace(VideoFrame frame,List<Crop> regions)
+    {
+        return regions.Select(region=>
+        {
+            int left=(int)(region.X*frame.Width), right=(int)((region.X+region.Width)*frame.Width);
+            int top=Math.Clamp((int)(region.Y*frame.Height),0,frame.Height-1);
+            int bottom=Math.Clamp((int)((region.Y+region.Height)*frame.Height),top+1,frame.Height);
+            int limit=(int)((bottom-top)*1.1);
+            int leftLimit=0,rightLimit=frame.Width;
+            foreach(var other in regions)
+            {
+                if(other==region || other.Y>=region.Y+region.Height || other.Y+other.Height<=region.Y)continue;
+                if(other.X+other.Width<=region.X)leftLimit=Math.Max(leftLimit,(int)((other.X+other.Width+region.X)*frame.Width/2));
+                if(other.X>=region.X+region.Width)rightLimit=Math.Min(rightLimit,(int)((other.X+region.X+region.Width)*frame.Width/2));
+            }
+            bool DarkColumn(int x)
+            {
+                if(x<0 || x>=frame.Width)return false;
+                int dark=0,count=0;
+                for(int y=top;y<bottom;y+=2) {int p=(y*frame.Width+x)*4;count++;if(Math.Max(frame.Pixels[p],Math.Max(frame.Pixels[p+1],frame.Pixels[p+2]))<105)dark++;}
+                return dark>count*.75;
+            }
+            // Blank LED positions live in the same dark window. Stop at a light
+            // divider or another field rather than using the current value as
+            // the field boundary.
+            for(int n=0;n<limit && left>leftLimit && DarkColumn(left-1);n++)left--;
+            for(int n=0;n<limit && right<rightLimit && DarkColumn(right);n++)right++;
+            return new Crop(left/(double)frame.Width,region.Y,(right-left)/(double)frame.Width,region.Height).Clamp();
+        }).ToList();
     }
 
     // Backlit red/amber display windows provide more stable boundaries than lit
