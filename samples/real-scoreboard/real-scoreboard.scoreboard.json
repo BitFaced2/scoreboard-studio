@@ -1,0 +1,177 @@
+{
+    "Version":  1,
+    "Name":  "Real scoreboard sample",
+    "Fields":  [
+                   {
+                       "Id":  "b0de7000-0000-4000-8000-000000000001",
+                       "Name":  "Game clock",
+                       "Region":  {
+                                      "X":  0.3181818181818182,
+                                      "Y":  0.0234375,
+                                      "Width":  0.3712121212121212,
+                                      "Height":  0.22135416666666666
+                                  },
+                       "Cleanup":  {
+                                       "Threshold":  220,
+                                       "Softness":  24,
+                                       "Smooth":  true,
+                                       "Isolation":  "White highlights"
+                                   },
+                       "Enabled":  true
+                   },
+                   {
+                       "Id":  "b0de7000-0000-4000-8000-000000000002",
+                       "Name":  "Home score",
+                       "Region":  {
+                                      "X":  0.0696969696969697,
+                                      "Y":  0.4192708333333333,
+                                      "Width":  0.20227272727272727,
+                                      "Height":  0.21354166666666666
+                                  },
+                       "Cleanup":  {
+                                       "Threshold":  170,
+                                       "Softness":  40,
+                                       "Smooth":  true,
+                                       "Isolation":  "White highlights"
+                                   },
+                       "Enabled":  true
+                   },
+                   {
+                       "Id":  "b0de7000-0000-4000-8000-000000000003",
+                       "Name":  "Away score",
+                       "Region":  {
+                                      "X":  0.7454545454545455,
+                                      "Y":  0.4348958333333333,
+                                      "Width":  0.20454545454545456,
+                                      "Height":  0.21614583333333334
+                                  },
+                       "Cleanup":  {
+                                       "Threshold":  170,
+                                       "Softness":  40,
+                                       "Smooth":  true,
+                                       "Isolation":  "White highlights"
+                                   },
+                       "Enabled":  true
+                   },
+                   {
+                       "Id":  "b0de7000-0000-4000-8000-000000000004",
+                       "Name":  "Period",
+                       "Region":  {
+                                      "X":  0.4628787878787879,
+                                      "Y":  0.4557291666666667,
+                                      "Width":  0.07727272727272727,
+                                      "Height":  0.1640625
+                                  },
+                       "Cleanup":  {
+                                       "Threshold":  170,
+                                       "Softness":  40,
+                                       "Smooth":  true,
+                                       "Isolation":  "White highlights"
+                                   },
+                       "Enabled":  true
+                   },
+                   {
+                       "Id":  "b0de7000-0000-4000-8000-000000000005",
+                       "Name":  "Home fouls",
+                       "Region":  {
+                                      "X":  0.07424242424242425,
+                                      "Y":  0.7239583333333334,
+                                      "Width":  0.09924242424242424,
+                                      "Height":  0.16796875
+                                  },
+                       "Cleanup":  {
+                                       "Threshold":  170,
+                                       "Softness":  40,
+                                       "Smooth":  true,
+                                       "Isolation":  "White highlights"
+                                   },
+                       "Enabled":  true
+                   },
+                   {
+                       "Id":  "b0de7000-0000-4000-8000-000000000006",
+                       "Name":  "Away fouls",
+                       "Region":  {
+                                      "X":  0.8325757575757575,
+                                      "Y":  0.7447916666666666,
+                                      "Width":  0.09545454545454546,
+                                      "Height":  0.15625
+                                  },
+                       "Cleanup":  {
+                                       "Threshold":  170,
+                                       "Softness":  40,
+                                       "Smooth":  true,
+                                       "Isolation":  "White highlights"
+                                   },
+                       "Enabled":  true
+                   },
+                   {
+                       "Id":  "b0de7000-0000-4000-8000-000000000007",
+                       "Name":  "Home timeouts",
+                       "Region":  {
+                                      "X":  0.23939393939393938,
+                                      "Y":  0.7369791666666666,
+                                      "Width":  0.07121212121212121,
+                                      "Height":  0.15755208333333334
+                                  },
+                       "Cleanup":  {
+                                       "Threshold":  170,
+                                       "Softness":  40,
+                                       "Smooth":  true,
+                                       "Isolation":  "White highlights"
+                                   },
+                       "Enabled":  true
+                   },
+                   {
+                       "Id":  "b0de7000-0000-4000-8000-000000000008",
+                       "Name":  "Away timeouts",
+                       "Region":  {
+                                      "X":  0.6931818181818182,
+                                      "Y":  0.75,
+                                      "Width":  0.07121212121212121,
+                                      "Height":  0.15625
+                                  },
+                       "Cleanup":  {
+                                       "Threshold":  170,
+                                       "Softness":  40,
+                                       "Smooth":  true,
+                                       "Isolation":  "White highlights"
+                                   },
+                       "Enabled":  true
+                   },
+                   {
+                       "Id":  "b0de7000-0000-4000-8000-000000000009",
+                       "Name":  "Player number",
+                       "Region":  {
+                                      "X":  0.38106060606060604,
+                                      "Y":  0.7421875,
+                                      "Width":  0.1431818181818182,
+                                      "Height":  0.16145833333333334
+                                  },
+                       "Cleanup":  {
+                                       "Threshold":  170,
+                                       "Softness":  40,
+                                       "Smooth":  true,
+                                       "Isolation":  "White highlights"
+                                   },
+                       "Enabled":  true
+                   },
+                   {
+                       "Id":  "b0de7000-0000-4000-8000-000000000010",
+                       "Name":  "Player fouls",
+                       "Region":  {
+                                      "X":  0.5606060606060606,
+                                      "Y":  0.75,
+                                      "Width":  0.05909090909090909,
+                                      "Height":  0.14973958333333334
+                                  },
+                       "Cleanup":  {
+                                       "Threshold":  170,
+                                       "Softness":  40,
+                                       "Smooth":  true,
+                                       "Isolation":  "White highlights"
+                                   },
+                       "Enabled":  true
+                   }
+               ],
+    "ImagePath":  "scoreboard.png"
+}

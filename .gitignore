@@ -1,0 +1,21 @@
+**/bin/
+**/obj/
+.vs/
+artifacts/
+*.user
+
+# Local notes and reference photos
+/Software1.png
+/Software2.png
+/samples/real-scoreboard/scoreboard.png
+
+# Local credentials and editor state
+.env
+.env.*
+!.env.example
+*.pfx
+*.p12
+*.pem
+*.key
+.idea/
+*.suo
