@@ -1,18 +1,22 @@
-# Scoreboard Studio
+# TMS Scoreboard Studio
 
 A Windows desktop prototype that crops a real scoreboard camera feed into live, transparent video fields for a vMix scorebug. It preserves the physical scoreboard's digits. It does not read or regenerate scores and uses no OCR, AI model, cloud service, or paid image-processing library.
 
+The desktop interface uses Total Media Sports branding, with the supplied logo embedded in the application, blue action buttons, and red navigation accents. Existing setup files and NDI source names remain compatible.
+
 ## Run
 
-Download the Windows x64 ZIP from [GitHub Releases](https://github.com/BitFaced2/scoreboard-studio/releases). Choose **Extract All**, open the extracted folder, and launch `ScoreboardStudio.exe`. Keep its `samples` folder alongside it. `START-HERE.txt` contains launch, demo, and vMix instructions. The portable preview bundles .NET; NDI still requires a runtime installed separately or with vMix. Preview builds are unsigned.
+Download the Windows x64 ZIP from [GitHub Releases](https://github.com/BitFaced2/scoreboard-studio/releases). Choose **Extract All**, open the extracted folder, and launch `ScoreboardStudio.exe`. Keep its `samples` folder alongside it. `START-HERE.txt` contains launch, image setup, and vMix instructions. The portable preview bundles .NET; NDI still requires a runtime installed separately or with vMix. Preview builds are unsigned.
 
-Open `artifacts/ScoreboardStudio/ScoreboardStudio.exe` after publishing. The self-contained build includes .NET; it does not require a separate .NET installation. It starts with a clearly labeled, moving demo scoreboard and six sample fields. Outputs start **off**.
+Open `artifacts/ScoreboardStudio/ScoreboardStudio.exe` after publishing. The self-contained build includes .NET; it does not require a separate .NET installation. It starts with no source and no fields. Select an NDI source and click **Connect**, open a scoreboard image, or load a saved setup. Outputs start **off**.
 
-The public repository includes the synthetic demo and a ten-field example layout. The real reference photo and original planning images are excluded. To use **Open real scoreboard sample**, place the matching reference photo at `samples/real-scoreboard/scoreboard.png` before building. The sample button is available only when that photo is present. For your own photos, use **Open scoreboard image** and create or adjust the field boxes.
+The public repository includes a ten-field example layout. The real reference photo and original planning images are excluded. To use **Open real scoreboard sample**, place the matching reference photo at `samples/real-scoreboard/scoreboard.png` before building. The sample button is available only when that photo is present. For your own photos, use **Open scoreboard image** and create or adjust the field boxes.
 
 When present, sample files are copied to the `samples` folder next to the executable; keep that folder with the app. Saving the sample prompts for a new setup filename. Image setups remember a relative image path, so loading them restores the still image as well as the field settings.
 
-The v0.2.0 presentation ZIP includes the reference photo and prepared layout, so **Open real scoreboard sample** works immediately. The photo remains excluded from the Git source history.
+The v0.2.1 presentation ZIP includes the reference photo and prepared layout, the TMS PDF user guide, and the recorded-clock setup in `samples/recorded-clock`. **Open real scoreboard sample** works immediately. The photo remains excluded from Git source history. The built-in synthetic demo has been removed.
+
+To test your recorded clip, play it in vMix and send its full frame over NDI, then load `samples/recorded-clock/basketball-clocks.scoreboard.json` and connect to that source. Bring the recording separately; video files are not included in the download. The sample's `PLAYBACK-NOTES.txt` explains the workflow.
 
 ## Angled cameras
 
@@ -38,7 +42,7 @@ For NDI input and output, an NDI runtime must be installed. The app checks the s
 4. Move a field by dragging inside its box; resize from its lower-right square. Exact crop positions are also editable as percentages. Leave room for every possible digit, including scores that gain a digit.
 5. Select a field and use **Cleanup** to compare its original crop with the transparent result. Adjust cutoff, softness, brightness, color, thickness, smoothing, and speckle removal. Settings are independent per field.
 6. Save your setup. Layouts include perspective, field names, normalized crops, cleanup settings, output enablement, and the source name or still-image path. They do not embed images or GTZIP artwork. Loading a saved NDI layout requires connecting the source again, and never starts outputs automatically.
-7. Click **Start NDI outputs**. In vMix, add each `Scoreboard - <field name>` NDI source as an input and position those inputs as layers over your existing scorebug/GT title. The machine name is added by NDI. Demo and still-image outputs explicitly contain `DEMO` or `STILL` in their names.
+7. Click **Start NDI outputs**. In vMix, add each `Scoreboard - <field name>` NDI source as an input and position those inputs as layers over your existing scorebug/GT title. The machine name is added by NDI. Still-image outputs explicitly contain `STILL` in their names.
 8. Use **Lock for live** to protect source/crop/cleanup controls. You can still stop outputs. Unlock to edit again.
 
 If no new NDI frame arrives for 1.5 seconds, the app displays **NO SIGNAL**, dims the source preview, and sends transparent fields. It resumes when video returns. This detects missing frames, not a camera or upstream encoder repeatedly transmitting a frozen image. Stopping outputs sends a transparent frame before closing the senders.

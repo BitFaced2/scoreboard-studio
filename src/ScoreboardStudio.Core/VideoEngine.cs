@@ -43,7 +43,6 @@ public sealed class VideoEngine : IDisposable
                     string status = "Choose a source";
                     switch (current.Kind)
                     {
-                        case "Demo": latest = DemoSource.Render(clock.Elapsed.TotalSeconds); healthy = true; status = "DEMO • Synthetic scoreboard"; break;
                         case "Image": latest = current.Still; healthy = latest is not null; status = "STILL IMAGE • Setup only"; break;
                         case "NDI":
                             if (receiver is null && clock.Elapsed.TotalSeconds >= retryAt)
@@ -103,6 +102,6 @@ public sealed class VideoEngine : IDisposable
             { try { sender.Send(new(2, 2, new byte[16])); } catch { } sender.Dispose(); }
         }
     }
-    public static string OutputName(string kind, string field) => $"Scoreboard{(kind == "Demo" ? " DEMO" : kind == "Image" ? " STILL" : "")} - {Layout.CleanName(field)}";
+    public static string OutputName(string kind, string field) => $"Scoreboard{(kind == "Image" ? " STILL" : "")} - {Layout.CleanName(field)}";
     public void Dispose() { cancellation.Cancel(); worker.GetAwaiter().GetResult(); cancellation.Dispose(); }
 }

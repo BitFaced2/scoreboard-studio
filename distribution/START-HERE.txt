@@ -1,4 +1,7 @@
-SCOREBOARD STUDIO - PORTABLE WINDOWS PREVIEW
+TMS SCOREBOARD STUDIO - PORTABLE WINDOWS PREVIEW
+
+Version 0.2.1: TMS branding, source-first startup, no built-in demo mode.
+The included PDF user guide covers setup, cleanup, vMix and troubleshooting.
 
 START THE APP
 
@@ -12,11 +15,12 @@ This preview is unsigned. Windows may display an unknown-publisher warning.
 Official downloads: https://github.com/BitFaced2/scoreboard-studio/releases
 The release's SHA256SUMS.txt identifies the published ZIP's checksum.
 
-TRY IT WITHOUT A CAMERA
+CONNECT A SOURCE OR OPEN AN IMAGE
 
-The app starts with a moving synthetic scoreboard and six prepared fields.
-Select a field on the left, then choose Cleanup to compare its original digits
-with the transparent result. The demo does not require an NDI runtime.
+The app starts with no source and no fields. Select an NDI source and click
+Connect, open a scoreboard image, or load a saved setup. Select a field, then
+choose Cleanup to compare its original digits with the transparent result.
+Image setup does not require an NDI runtime.
 
 The presentation package includes a photo and ten prepared fields. Choose
 Open real scoreboard sample to load them. It is a still image, so its clock
@@ -39,16 +43,22 @@ one is available. The runtime and vMix are not included in this package.
 4. In vMix, use Add Input > NDI to add each Scoreboard - <field name> input.
 5. Position those inputs as layers over your scorebug. They include transparency.
 
-Synthetic demo outputs contain DEMO in their names; still-image outputs contain
-STILL. NDI adds your computer name to the source names. Outputs start stopped.
+Still-image outputs contain STILL in their names. NDI adds your computer name to the source names. Outputs start stopped.
 Lock for live protects editing. Opening the perspective editor stops outputs;
 start them again when ready.
+
+TEST WITH YOUR RECORDED CLIP
+
+Bring your recording separately; no videos are included in this download.
+Play and loop it in vMix, then send the full video frame over NDI. Load
+samples/recorded-clock/basketball-clocks.scoreboard.json in Scoreboard Studio
+and connect to that NDI source. See that folder's PLAYBACK-NOTES.txt for details.
 
 IF SOMETHING DOES NOT WORK
 
 - NDI unavailable: ensure vMix/NDI runtime is installed. A custom runtime can be
   located with SCOREBOARD_NDI_RUNTIME set to its 64-bit DLL path before launch.
-  Demo and photo cleanup remain available without NDI.
+  Photo cleanup remains available without NDI.
 - No NDI sources: confirm the source is sending NDI, then click Refresh. Check
   the intended network and that firewall access allows the apps to communicate.
 - Missing photo: extract the entire ZIP, including its samples subfolder.

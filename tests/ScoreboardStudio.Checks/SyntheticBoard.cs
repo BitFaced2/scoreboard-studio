@@ -1,6 +1,6 @@
-namespace ScoreboardStudio.Core;
+using ScoreboardStudio.Core;
 
-public static class DemoSource
+internal static class SyntheticBoard
 {
     public static List<ScoreField> Fields() => [
         new() { Name = "Game clock", Region = new(390.0/1280, 135.0/720, 485.0/1280, 140.0/720) },

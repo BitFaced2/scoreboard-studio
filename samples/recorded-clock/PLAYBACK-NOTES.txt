@@ -1,0 +1,23 @@
+RECORDED BASKETBALL CLOCK SETUP
+
+This layout was prepared for the 31.7-second recording supplied for testing:
+2026-11-15 20-50-35.mp4, showing two adjacent basketball clock displays.
+It isolates Game Clock and Shot Clock on the RIGHT-HAND display and includes
+four-corner correction and per-field cleanup.
+
+The video is not included. Copy your original capture or the prepared
+basketball-camera-720p.mp4 to the studio computer separately.
+
+1. Play the video in vMix. Enable looping if desired.
+2. Send the video input over NDI. Keep the full 16:9 frame with no zoom,
+   cropping, borders or overlays. This layout uses normalized coordinates.
+3. In Scoreboard Studio, load basketball-clocks.scoreboard.json.
+4. Select the corresponding NDI source and click Connect.
+5. Review both fields, then click Start NDI outputs.
+6. Add Scoreboard - Game Clock and Scoreboard - Shot Clock as NDI inputs
+   in vMix and position them as layers over your scorebug.
+
+The original camera input must stay separate from the composed scorebug to
+avoid feedback. The app does not open MP4 files directly. The clock jumps
+back to its starting value at each loop. This is recorded footage, not a
+live game or an internal demo mode. Other recordings need their own crops.

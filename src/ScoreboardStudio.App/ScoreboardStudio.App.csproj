@@ -1,6 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <Resource Include="Assets\TMS_logo.png" />
     <ProjectReference Include="..\ScoreboardStudio.Core\ScoreboardStudio.Core.csproj" />
     <Content Include="..\..\samples\real-scoreboard\*" Link="samples\real-scoreboard\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
   </ItemGroup>
@@ -13,7 +14,10 @@
     <UseWPF>true</UseWPF>
     <PlatformTarget>x64</PlatformTarget>
     <AssemblyName>ScoreboardStudio</AssemblyName>
-    <Version>0.2.0</Version>
+    <Version>0.2.1</Version>
+    <Company>Total Media Sports</Company>
+    <Product>TMS Scoreboard Studio</Product>
+    <Description>Live scoreboard fields for broadcast graphics by Total Media Sports.</Description>
   </PropertyGroup>
 
 </Project>

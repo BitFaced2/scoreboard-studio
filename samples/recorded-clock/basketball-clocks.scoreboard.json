@@ -1,0 +1,75 @@
+{
+  "Version": 1,
+  "Name": "Captured basketball clocks",
+  "SourceName": null,
+  "ImagePath": null,
+  "Perspective": {
+    "Enabled": true,
+    "TopLeft": {
+      "X": 0.4583333333333333,
+      "Y": 0.27037037037037037
+    },
+    "TopRight": {
+      "X": 0.703125,
+      "Y": 0.28703703703703703
+    },
+    "BottomRight": {
+      "X": 0.6822916666666666,
+      "Y": 0.7388888888888889
+    },
+    "BottomLeft": {
+      "X": 0.4479166666666667,
+      "Y": 0.7240740740740741
+    },
+    "Width": 480,
+    "Height": 500
+  },
+  "Fields": [
+    {
+      "Id": "54b420df-e418-4550-9052-04369da10dfc",
+      "Name": "Game Clock",
+      "Region": {
+        "X": 0.06,
+        "Y": 0.06,
+        "Width": 0.89,
+        "Height": 0.31
+      },
+      "Cleanup": {
+        "Isolation": "Bright colors",
+        "Threshold": 125,
+        "Softness": 55,
+        "Brightness": 1,
+        "Thickness": 0,
+        "Smooth": true,
+        "RemoveSpeckles": true,
+        "RemoveBackground": true,
+        "Color": "White",
+        "CustomColor": "#FFFFFF"
+      },
+      "Enabled": true
+    },
+    {
+      "Id": "c9bdcf60-8665-4941-97e8-f070caaf575e",
+      "Name": "Shot Clock",
+      "Region": {
+        "X": 0.22,
+        "Y": 0.43,
+        "Width": 0.61,
+        "Height": 0.46
+      },
+      "Cleanup": {
+        "Isolation": "Bright colors",
+        "Threshold": 125,
+        "Softness": 55,
+        "Brightness": 1,
+        "Thickness": 0,
+        "Smooth": true,
+        "RemoveSpeckles": true,
+        "RemoveBackground": true,
+        "Color": "White",
+        "CustomColor": "#FFFFFF"
+      },
+      "Enabled": true
+    }
+  ]
+}

@@ -109,7 +109,7 @@ Check("Thickness grows the silhouette and smoothing keeps intermediate alpha", (
     var smooth = FrameProcessor.Process(f, whole, plain with { Smooth = true });
     Require(smooth.Pixels[(5*10+5)*4+3] is > 0 and < 255, "Smoothing did not create soft edges.");
 });
-Check("Detector proposes separated regions without hard-coded demo coordinates", () =>
+Check("Detector proposes separated regions without hard-coded coordinates", () =>
 {
     var f = Solid(640,360,0,0,0);
     foreach (var (left,top) in new[] {(35,55),(370,210)})
@@ -118,17 +118,17 @@ Check("Detector proposes separated regions without hard-coded demo coordinates",
     Require(regions.Count == 2, $"Expected two groups, got {regions.Count}.");
     Require(FieldDetector.Detect(Solid(640,360,0,0,0)).Count == 0, "Blank frame yielded suggestions.");
 });
-Check("Detector separates all six synthetic demo fields", () =>
+Check("Detector separates all six synthetic test fields", () =>
 {
-    var regions = FieldDetector.Detect(DemoSource.Render(10),90);
-    Require(regions.Count == 6, $"Expected six demo regions, got {regions.Count}.");
+    var regions = FieldDetector.Detect(SyntheticBoard.Render(10),90);
+    Require(regions.Count == 6, $"Expected six test regions, got {regions.Count}.");
 });
 Check("Setup round trip preserves fields and rejects malformed or future layouts", () =>
 {
     string path = Path.Combine(Path.GetTempPath(), Guid.NewGuid()+".json");
     try
     {
-        var fields = DemoSource.Fields(); fields[0].Cleanup = new() { Color="Custom", CustomColor="#123456", Thickness=2 };
+        var fields = SyntheticBoard.Fields(); fields[0].Cleanup = new() { Color="Custom", CustomColor="#123456", Thickness=2 };
         fields[0].Cleanup.Isolation="White highlights";
         new Layout { Name="Arena", SourceName="Camera A", ImagePath="scoreboard.png", Perspective=new() { Enabled=true,TopLeft=new(.1,.1) }, Fields=fields }.Save(path);
         var read = Layout.Load(path);
@@ -146,13 +146,21 @@ Check("Setup round trip preserves fields and rejects malformed or future layouts
     }
     finally { File.Delete(path); File.Delete(path+".tmp"); }
 });
-Check("Video engine produces live demo fields with no NDI dependency", () =>
+Check("Video engine waits without generating fields or outputs until a source is provided", () =>
 {
     using var engine = new VideoEngine();
-    engine.Configure(new("Demo",null,null,DemoSource.Fields().ToArray(),false,1));
+    engine.Configure(new("None",null,null,[],false,1));
+    Thread.Sleep(120);
+    Require(engine.Preview.Source is null && !engine.Preview.Healthy && engine.Preview.Fields.Count==0 && engine.Preview.OutputCount==0,"Empty startup generated video or outputs.");
+    Require(engine.Preview.Status=="Choose a source","Empty startup did not prompt for a source.");
+});
+Check("Video engine processes a still source with no NDI dependency", () =>
+{
+    using var engine = new VideoEngine();
+    engine.Configure(new("Image",null,SyntheticBoard.Render(10),SyntheticBoard.Fields().ToArray(),false,1));
     var clock=Stopwatch.StartNew();
     while(engine.Preview.Fields.Count!=6 && clock.Elapsed.TotalSeconds<5) Thread.Sleep(50);
-    Require(engine.Preview.Healthy && engine.Preview.Fields.Count==6,"Demo pipeline did not start.");
+    Require(engine.Preview.Healthy && engine.Preview.Fields.Count==6,"Still-image pipeline did not start.");
     Console.WriteLine($"  Six-field processing: {engine.Preview.ProcessingMs:0.0} ms");
 });
 Check("Video engine applies perspective before field cropping and keeps raw preview", () =>

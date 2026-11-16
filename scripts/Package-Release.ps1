@@ -1,4 +1,4 @@
-param([switch]$IncludeReferencePhoto, [switch]$VerifyNdi)
+param([switch]$IncludeReferencePhoto, [switch]$VerifyNdi, [string]$UserGuide)
 $ErrorActionPreference = 'Stop'
 $taskRoot = Split-Path $PSScriptRoot -Parent
 Push-Location -LiteralPath $taskRoot
@@ -13,6 +13,7 @@ try {
     $taskAssets = Join-Path $taskRun 'assets'
     New-Item -ItemType Directory -Path $taskPackage, $taskAssets -Force | Out-Null
     if ($IncludeReferencePhoto -and -not (Test-Path -LiteralPath 'samples/real-scoreboard/scoreboard.png')) { throw 'Reference photo is missing.' }
+    if ($UserGuide -and -not (Test-Path -LiteralPath $UserGuide -PathType Leaf)) { throw 'User guide is missing.' }
     dotnet build ScoreboardStudio.sln -c Release
     if ($LASTEXITCODE -ne 0) { throw 'Build failed.' }
     $taskCheckArgs = @('run', '--project', 'tests/ScoreboardStudio.Checks', '-c', 'Release', '--no-build')
@@ -27,6 +28,10 @@ try {
     # Include known user-facing files only, never debug symbols or build folders.
     Copy-Item -LiteralPath (Join-Path $taskPublish 'ScoreboardStudio.exe') -Destination $taskPackage
     Copy-Item -LiteralPath 'README.md', 'distribution/START-HERE.txt' -Destination $taskPackage
+    if ($UserGuide) { Copy-Item -LiteralPath $UserGuide -Destination (Join-Path $taskPackage 'TMS Scoreboard Studio - User Guide.pdf') }
+    $taskClockSample = Join-Path $taskPackage 'samples/recorded-clock'
+    New-Item -ItemType Directory -Path $taskClockSample -Force | Out-Null
+    Copy-Item -Path 'samples/recorded-clock/*' -Destination $taskClockSample
     $taskSample = Join-Path $taskPackage 'samples/real-scoreboard'
     New-Item -ItemType Directory -Path $taskSample -Force | Out-Null
     Copy-Item -LiteralPath 'samples/real-scoreboard/real-scoreboard.scoreboard.json' -Destination $taskSample

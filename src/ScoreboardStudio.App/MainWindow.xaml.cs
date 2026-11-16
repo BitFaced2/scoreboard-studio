@@ -23,7 +23,7 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromMilliseconds(100) };
     private NdiDiscovery? discovery;
     private bool ready, updating, dirty, locked, output, drawing, dragging, resizing;
-    private string kind = "Demo", setupName = "Demo setup";
+    private string kind = "None", setupName = "Untitled setup";
     private string? savePath;
     private string? stillPath;
     private PerspectiveSettings perspective = new();
@@ -46,10 +46,9 @@ public partial class MainWindow : Window
         RealSampleButton.ToolTip = RealSampleButton.IsEnabled ? "Open the reference photo and its prepared fields" : "Optional reference photo is not included. Use Open scoreboard image for your own photo.";
         FieldList.ItemsSource = fields;
         OutputCards.ItemsSource = cards;
-        foreach (var field in DemoSource.Fields()) fields.Add(field);
         ready = true;
         SyncFields();
-        FieldList.SelectedIndex = 0;
+        SetupTitle.Text = setupName;
         timer.Tick += (_, _) => RefreshPreview();
         Loaded += OnLoaded;
     }
@@ -59,7 +58,7 @@ public partial class MainWindow : Window
         try
         {
             bool available = await Task.Run(NdiRuntime.Initialize);
-            RuntimeStatus.Text = available ? "NDI READY   •   Local processing   •   No OCR" : "NDI UNAVAILABLE   •   Demo and image setup are available";
+            RuntimeStatus.Text = available ? "NDI READY   •   Local processing   •   No OCR" : "NDI UNAVAILABLE   •   Image setup is available";
             RuntimeStatus.ToolTip = NdiRuntime.LibraryPath ?? NdiRuntime.Status;
             if (available) discovery = new NdiDiscovery();
             RefreshSources();
@@ -87,15 +86,16 @@ public partial class MainWindow : Window
         cards.Clear();
         foreach (var field in fields) cards.Add(new() { Id = field.Id, Name = field.Name, Output = VideoEngine.OutputName(kind, field.Name) });
         Inspector.IsEnabled = Selected is not null && !locked;
+        EmptyFieldsText.Visibility = fields.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         RenderBoxes();
     }
     private void RefreshSources()
     {
-        if (discovery is null) { DiscoveryText.Text = "NDI runtime unavailable. You can still try the demo."; return; }
+        if (discovery is null) { DiscoveryText.Text = "NDI runtime unavailable. Open a scoreboard image for setup, or install the runtime to connect video."; return; }
         try
         {
             var selected = (SourceCombo.SelectedItem as NdiSource)?.Name;
-            var found = discovery.GetSources().Where(s => !s.Name.Contains("(Scoreboard - ") && !s.Name.Contains("(Scoreboard DEMO - ") && !s.Name.Contains("(Scoreboard STILL - ")).ToList();
+            var found = discovery.GetSources().Where(s => !s.Name.Contains("(Scoreboard - ") && !s.Name.Contains("(Scoreboard STILL - ")).ToList();
             SourceCombo.ItemsSource = found;
             SourceCombo.SelectedItem = found.FirstOrDefault(s => s.Name == selected) ?? found.FirstOrDefault();
             DiscoveryText.Text = found.Count == 0 ? "No sources found. Enable NDI on your vMix scoreboard output." : $"{found.Count} NDI source{(found.Count == 1 ? "" : "s")} available";
@@ -106,9 +106,10 @@ public partial class MainWindow : Window
     {
         var preview = engine.Preview;
         SignalText.Text = preview.Status;
-        SignalBanner.Background = Brush(preview.Healthy ? kind == "NDI" ? "#173D32" : "#40331E" : "#4C2429");
-        SignalText.Foreground = Brush(preview.Healthy ? kind == "NDI" ? "#8EF2D0" : "#F2CA83" : "#FFB1B9");
+        SignalBanner.Background = Brush(kind == "None" ? "#17304A" : preview.Healthy ? kind == "NDI" ? "#173D32" : "#40331E" : "#4C2429");
+        SignalText.Foreground = Brush(kind == "None" ? "#A8D6FF" : preview.Healthy ? kind == "NDI" ? "#8EF2D0" : "#F2CA83" : "#FFB1B9");
         var displayFrame = EditingPerspective ? preview.RawSource : preview.Source;
+        EmptySourcePanel.Visibility = displayFrame is null ? Visibility.Visible : Visibility.Collapsed;
         if (displayFrame is { } frame)
         {
             if (VideoSurface.Width != frame.Width || VideoSurface.Height != frame.Height)
@@ -146,7 +147,7 @@ public partial class MainWindow : Window
         suggestions.Clear(); AcceptDetection.Visibility = Visibility.Collapsed; beforeDetection = null; UndoDetection.Visibility = Visibility.Collapsed;
         drawing = false; DrawButton.Content = "+ Draw a field";
         SyncFields(); Changed();
-        Notice.Text = newKind == "NDI" ? "Source connected. Review every crop before starting outputs." : newKind == "Image" ? "Still image mode is for setup. Its outputs are labeled STILL." : "Demo mode is active. Outputs are labeled DEMO to distinguish them from a real game.";
+        Notice.Text = newKind == "NDI" ? "Source connected. Review every crop before starting outputs." : newKind == "Image" ? "Still image mode is for setup. Its outputs are labeled STILL." : "Choose an NDI source or open a scoreboard image to begin.";
         if (perspective.Enabled) Notice.Text += " Perspective correction is retained; review its corners for this source.";
     }
     private void RefreshClick(object sender, RoutedEventArgs e) => RefreshSources();
@@ -155,12 +156,6 @@ public partial class MainWindow : Window
         if (locked) return;
         if (SourceCombo.SelectedItem is NdiSource chosen) SwitchSource("NDI", chosen);
         else Notice.Text = "Select an NDI source first. Refresh to scan again.";
-    }
-    private void DemoClick(object sender, RoutedEventArgs e)
-    {
-        if (locked) return;
-        if (fields.Count == 0) foreach (var f in DemoSource.Fields()) fields.Add(f);
-        SwitchSource("Demo");
     }
     private void ImageClick(object sender, RoutedEventArgs e)
     {
@@ -301,6 +296,7 @@ public partial class MainWindow : Window
     private void DrawClick(object sender, RoutedEventArgs e)
     {
         if (locked) return;
+        if (engine.Preview.Source is null || !engine.Preview.Healthy) { Notice.Text = "Connect a video source or open a scoreboard image before drawing fields."; return; }
         if (fields.Count >= 24) { Notice.Text = "This version supports up to 24 fields."; return; }
         drawing = !drawing; DrawButton.Content = drawing ? "Cancel drawing" : "+ Draw a field";
         WorkspaceTabs.SelectedIndex = 0; BoxCanvas.Cursor = drawing ? Cursors.Cross : Cursors.Arrow;
@@ -478,14 +474,29 @@ public partial class MainWindow : Window
         try
         {
             Directory.CreateDirectory(directory);
-            for (int i = 0; i < 100 && engine.Preview.Fields.Count != 6; i++) await Task.Delay(100);
-            if (engine.Preview.Fields.Count != 6) throw new Exception("Demo did not produce six cleaned fields.");
+            await Task.Delay(200); RefreshPreview(); UpdateLayout();
+            if (kind != "None" || fields.Count != 0 || engine.Preview.Source is not null || engine.Preview.Healthy || engine.Preview.OutputCount != 0 || output || dirty || Inspector.IsEnabled || EmptySourcePanel.Visibility != Visibility.Visible)
+                throw new Exception("Startup must wait for a source with no fields or outputs.");
+            DrawClick(this, new());
+            if (drawing || fields.Count != 0) throw new Exception("Drawing was allowed without a source.");
+            CaptureWindow(System.IO.Path.Combine(directory,"startup.png"));
+            if (!RealSampleButton.IsEnabled)
+            {
+                File.WriteAllText(System.IO.Path.Combine(directory, "ui-checks.txt"), "PASS: empty startup, no source or outputs, disabled inspector, drawing blocked. SKIP: optional photo fixture is absent.\n");
+                return;
+            }
+            OpenLayout(System.IO.Path.Combine(AppContext.BaseDirectory,"samples","real-scoreboard","real-scoreboard.scoreboard.json"),sample:true);
+            for (int i = 0; i < 100 && engine.Preview.Fields.Count != 10; i++) await Task.Delay(100);
+            if (engine.Preview.Fields.Count != 10) throw new Exception("Photo did not produce ten cleaned fields.");
+            var originalField = fields[1].Snapshot();
             FieldList.SelectedIndex = 1; Threshold.Value = 120;
             if (fields[1].Cleanup.Threshold != 120) throw new Exception("Cleanup UI did not update the processing settings.");
             FieldName.Text = "Home points"; RenameField(this, new());
             if (fields[1].Name != "Home points") throw new Exception("Rename did not persist.");
             CropX.Text = "15"; CropY.Text = "47"; CropW.Text = "17"; CropH.Text = "22"; ApplyCropClick(this, new());
             if (Math.Abs(fields[1].Region.X - .15) > .001) throw new Exception("Crop controls did not update.");
+            fields[1].Name = originalField.Name; fields[1].Region = originalField.Region; fields[1].Cleanup = originalField.Cleanup;
+            SyncFields(); PushPlan();
             FieldList.SelectedIndex = 0;
             if (FieldList.SelectedItems.Count != 1 || Selected != fields[0] || FieldName.Text != "Game clock") throw new Exception("Selection changed incorrectly after editing a field.");
             for (int tab = 0; tab < 3; tab++)
@@ -498,11 +509,6 @@ public partial class MainWindow : Window
             LiveClick(this, new());
             if (Inspector.IsEnabled || SourceControls.IsEnabled || BoxCanvas.Children.Count != 0) throw new Exception("Live lock did not protect editing.");
             LiveClick(this, new());
-            if (!RealSampleButton.IsEnabled)
-            {
-                File.WriteAllText(System.IO.Path.Combine(directory, "ui-checks.txt"), "PASS: demo preview, selection, cleanup, rename, crop, all tabs, live lock. SKIP: optional real-photo and perspective UI fixture is absent.\n");
-                return;
-            }
             OpenLayout(System.IO.Path.Combine(AppContext.BaseDirectory,"samples","real-scoreboard","real-scoreboard.scoreboard.json"),sample:true);
             for(int i=0;i<100 && engine.Preview.Fields.Count!=10;i++) await Task.Delay(100);
             if(kind!="Image" || fields.Count!=10 || IsolationMode.SelectedIndex!=1 || output) throw new Exception("Real scoreboard sample did not load as a stopped still image with white-highlight cleanup.");
@@ -520,7 +526,7 @@ public partial class MainWindow : Window
             if(perspective.TopLeft.X!=.025) throw new Exception("Cancel altered the accepted correction.");
             PerspectiveClick(this,new());ResetPerspectiveClick(this,new());
             if(perspective.Enabled) throw new Exception("Perspective reset failed.");
-            File.WriteAllText(System.IO.Path.Combine(directory, "ui-checks.txt"), "PASS: demo preview, selection, cleanup, rename, crop, all tabs, live lock, real photo setup, perspective apply/cancel/reset and pipeline.\n");
+            File.WriteAllText(System.IO.Path.Combine(directory, "ui-checks.txt"), "PASS: empty startup, source required for drawing, photo selection, cleanup, rename, crop, all tabs, live lock, real photo setup, perspective apply/cancel/reset and pipeline.\n");
         }
         catch (Exception ex) { File.WriteAllText(System.IO.Path.Combine(directory, "ui-error.txt"), ex.ToString()); Environment.ExitCode = 1; }
         finally { dirty = false; Close(); }

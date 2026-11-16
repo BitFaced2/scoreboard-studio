@@ -48,7 +48,7 @@ public static class NdiRuntime
                 Status = Available ? "NDI ready" : "NDI could not initialize on this machine.";
                 return Available;
             }
-            Status = "NDI runtime not found. Demo and image setup are available. Install the NDI runtime, or set SCOREBOARD_NDI_RUNTIME to its DLL path and restart.";
+            Status = "NDI runtime not found. Image setup is available. Install the NDI runtime, or set SCOREBOARD_NDI_RUNTIME to its DLL path and restart.";
             return false;
         }
     }
