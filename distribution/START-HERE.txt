@@ -1,0 +1,67 @@
+SCOREBOARD STUDIO - PORTABLE WINDOWS PREVIEW
+
+START THE APP
+
+1. Download ScoreboardStudio-...-win-x64.zip from GitHub Releases.
+   The automatically generated Source code downloads are for developers.
+2. Right-click the ZIP and choose Extract All. Keep the extracted folder intact.
+3. Open ScoreboardStudio.exe inside that folder. No installer or separate .NET
+   installation is needed. This build is for 64-bit Windows.
+
+This preview is unsigned. Windows may display an unknown-publisher warning.
+Official downloads: https://github.com/BitFaced2/scoreboard-studio/releases
+The release's SHA256SUMS.txt identifies the published ZIP's checksum.
+
+TRY IT WITHOUT A CAMERA
+
+The app starts with a moving synthetic scoreboard and six prepared fields.
+Select a field on the left, then choose Cleanup to compare its original digits
+with the transparent result. The demo does not require an NDI runtime.
+
+The presentation package includes a photo and ten prepared fields. Choose
+Open real scoreboard sample to load them. It is a still image, so its clock
+does not move. Keep the samples folder next to the executable. Save setup or
+Save as saves your own configuration.
+
+For an angled camera, choose Fields > Straighten camera, place the four corners
+around the board, and click Apply. Review field boxes after straightening.
+Automatic detection supplies suggestions that need review and naming.
+
+USE THE FIELDS IN VMIX
+
+NDI input/output requires an installed 64-bit NDI runtime. The app can use the
+runtime in a standard vMix installation. NDI READY appears at the bottom when
+one is available. The runtime and vMix are not included in this package.
+
+1. Make the scoreboard camera available as an NDI source from vMix.
+2. In Scoreboard Studio, select that source and click Connect.
+3. Set up the field boxes and cleanup, then click Start NDI outputs.
+4. In vMix, use Add Input > NDI to add each Scoreboard - <field name> input.
+5. Position those inputs as layers over your scorebug. They include transparency.
+
+Synthetic demo outputs contain DEMO in their names; still-image outputs contain
+STILL. NDI adds your computer name to the source names. Outputs start stopped.
+Lock for live protects editing. Opening the perspective editor stops outputs;
+start them again when ready.
+
+IF SOMETHING DOES NOT WORK
+
+- NDI unavailable: ensure vMix/NDI runtime is installed. A custom runtime can be
+  located with SCOREBOARD_NDI_RUNTIME set to its 64-bit DLL path before launch.
+  Demo and photo cleanup remain available without NDI.
+- No NDI sources: confirm the source is sending NDI, then click Refresh. Check
+  the intended network and that firewall access allows the apps to communicate.
+- Missing photo: extract the entire ZIP, including its samples subfolder.
+- NO SIGNAL: outputs clear after 1.5 seconds without new frames and resume when
+  video returns. Repeated frozen frames from a camera are not detected.
+- Red glow survives: try White highlights and raise Background cutoff.
+
+PREVIEW STATUS
+
+This is a prototype, not a signed installer or a finished broadcast product.
+It has been checked with synthetic video, a real still photo, geometry tests,
+and local NDI transmission. A live-game camera and the full vMix scorebug
+workflow still need validation. No OCR, cloud account, or model download is used.
+
+More details: README.md in this folder.
+Project and issues: https://github.com/BitFaced2/scoreboard-studio

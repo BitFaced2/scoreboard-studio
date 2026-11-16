@@ -4,11 +4,15 @@ A Windows desktop prototype that crops a real scoreboard camera feed into live, 
 
 ## Run
 
+Download the Windows x64 ZIP from [GitHub Releases](https://github.com/BitFaced2/scoreboard-studio/releases). Choose **Extract All**, open the extracted folder, and launch `ScoreboardStudio.exe`. Keep its `samples` folder alongside it. `START-HERE.txt` contains launch, demo, and vMix instructions. The portable preview bundles .NET; NDI still requires a runtime installed separately or with vMix. Preview builds are unsigned.
+
 Open `artifacts/ScoreboardStudio/ScoreboardStudio.exe` after publishing. The self-contained build includes .NET; it does not require a separate .NET installation. It starts with a clearly labeled, moving demo scoreboard and six sample fields. Outputs start **off**.
 
 The public repository includes the synthetic demo and a ten-field example layout. The real reference photo and original planning images are excluded. To use **Open real scoreboard sample**, place the matching reference photo at `samples/real-scoreboard/scoreboard.png` before building. The sample button is available only when that photo is present. For your own photos, use **Open scoreboard image** and create or adjust the field boxes.
 
 When present, sample files are copied to the `samples` folder next to the executable; keep that folder with the app. Saving the sample prompts for a new setup filename. Image setups remember a relative image path, so loading them restores the still image as well as the field settings.
+
+The v0.2.0 presentation ZIP includes the reference photo and prepared layout, so **Open real scoreboard sample** works immediately. The photo remains excluded from the Git source history.
 
 ## Angled cameras
 
@@ -63,6 +67,7 @@ dotnet run --project tests/ScoreboardStudio.Checks -c Release
 dotnet run --project tests/ScoreboardStudio.Checks -c Release -- --ndi
 dotnet run --project tests/ScoreboardStudio.Checks -c Release -- --image samples/real-scoreboard/scoreboard.png samples/real-scoreboard/real-scoreboard.scoreboard.json artifacts/real-scoreboard-checks
 powershell -ExecutionPolicy Bypass -File scripts/Build.ps1
+powershell -ExecutionPolicy Bypass -File scripts/Package-Release.ps1 -IncludeReferencePhoto -VerifyNdi
 ```
 
 The normal console checks require neither NDI nor the reference photo. `--ndi` additionally exercises an installed runtime with actual discovery, receive, cleaned output, alpha, signal loss, and recovery. `--image` requires the optional reference photo and produces a comparison sheet, detection overlay, and perspective example. The WPF executable also supports `--smoke-test <output-directory>` to exercise field selection/rename/crop/cleanup and render the work areas to PNG. When the reference photo is present, it also loads the real sample and verifies perspective apply/cancel/reset. These tests publish temporary local NDI sources only when `--ndi` is explicitly used.
