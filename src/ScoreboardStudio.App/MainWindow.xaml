@@ -395,6 +395,7 @@
     <Border Grid.Row="2" Background="#121922" BorderBrush="#283441" BorderThickness="0,1,0,0" Padding="24,0">
       <DockPanel VerticalAlignment="Center">
         <TextBlock x:Name="OutputStatus" DockPanel.Dock="Right" Text="OUTPUTS STOPPED" Foreground="{StaticResource Muted}" />
+        <Button DockPanel.Dock="Right" Content="Check for updates" Click="CheckUpdatesClick" Padding="10,5" Margin="0,0,16,0" />
         <TextBlock DockPanel.Dock="Left" Text="TOTAL MEDIA SPORTS" FontWeight="Bold" Foreground="#8BC7FF" Margin="0,0,24,0" />
         <TextBlock x:Name="RuntimeStatus" Text="Starting…" Foreground="{StaticResource Muted}" />
       </DockPanel>

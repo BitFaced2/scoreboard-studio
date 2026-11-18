@@ -1,10 +1,23 @@
-TMS SCOREBOARD STUDIO 0.4.1 - INTERNAL USE
+TMS SCOREBOARD STUDIO 0.5.0 - INTERNAL USE
 
 START
 
 Extract the portable ZIP and open ScoreboardStudio.exe. The Windows x64 build
 bundles .NET; no separate .NET installation is needed. The app starts with no
 source or fields, and outputs stopped.
+
+UPDATE THE APP
+
+Use Check for updates in the bottom bar, then Download update and Install and
+restart. Stop NDI outputs and unlock editing first. Save unsaved setup changes
+when prompted. The verified update replaces program files in the same folder;
+existing shortcuts, saved setups and recordings stay in place. The app reopens
+the saved setup with outputs stopped. Reconnect live sources and set stabilization
+again as needed. Internet access and a writable app folder are required.
+
+Versions older than 0.5.0 need one final manual GitHub ZIP download to get this
+feature. No uninstall is needed. Failed downloads do not change the app; ordinary
+installation write failures restore the previous files. Updates are never automatic.
 
 LOAD YOUR FOOTAGE
 

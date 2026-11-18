@@ -67,6 +67,10 @@ public partial class MainWindow : Window
             RefreshSources();
             PushPlan(); timer.Start();
             var args = Environment.GetCommandLineArgs();
+            CompleteUpdateStartup(args);
+            if(args.Contains("--update-test-exit")) {dirty=false;Close();return;}
+            int updateIndex=Array.IndexOf(args,"--update-smoke-test");
+            if(updateIndex>=0&&args.Length>updateIndex+1) {await UpdateSmokeTest(args[updateIndex+1]);return;}
             int index = Array.IndexOf(args, "--smoke-test");
             if (index >= 0 && args.Length > index + 1) await SmokeTest(args[index + 1]);
             int videoIndex = Array.IndexOf(args, "--video-smoke-test");
@@ -518,7 +522,7 @@ public partial class MainWindow : Window
     }
     private void WindowClosing(object? sender, CancelEventArgs e)
     {
-        if (Application.Current is not App {FatalError:true} && !ConfirmDiscard()) { e.Cancel = true; return; }
+        if (!restartingForUpdate && Application.Current is not App {FatalError:true} && !ConfirmDiscard()) { e.Cancel = true; return; }
         CancelDetection();timer.Stop(); video?.Dispose(); discovery?.Dispose(); engine.Dispose();
     }
 
@@ -626,6 +630,20 @@ public partial class MainWindow : Window
             if(perspective.Enabled) throw new Exception("Perspective reset failed.");
             string? recovery=SaveRecovery();
             if(recovery is null || Layout.Load(recovery).Fields.Count!=fields.Count)throw new Exception("Recovery setup could not be restored.");
+            if(testArgs.Contains("--update-ui-check"))
+            {
+                locked=true;CheckUpdatesClick(this,new());
+                if(Application.Current.Windows.Count!=1)throw new Exception("Update dialog opened while live editing was locked.");
+                locked=false;
+                var updates=new UpdateWindow {Owner=this};updates.Show();
+                for(int i=0;i<400 && updates.IsChecking;i++)await Task.Delay(100);
+                if(!updates.StatusText.Contains("up to date"))throw new Exception("Update UI check failed: "+updates.StatusText);
+                updates.UpdateLayout();
+                var updateBitmap=new RenderTargetBitmap((int)updates.ActualWidth,(int)updates.ActualHeight,96,96,PixelFormats.Pbgra32);
+                updateBitmap.Render(updates);var updateEncoder=new PngBitmapEncoder();updateEncoder.Frames.Add(BitmapFrame.Create(updateBitmap));
+                using(var file=File.Create(System.IO.Path.Combine(directory,"update-window.png")))updateEncoder.Save(file);
+                updates.Close();
+            }
             File.WriteAllText(System.IO.Path.Combine(directory, "ui-checks.txt"), "PASS: initial automatic placement once; manual add/remove; no redetection after edits, deletion, reload or empty saved layout; pending detection cannot overwrite edits; laptop resize/minimize; cleanup, rename, crop, tabs, live lock; frozen perspective view, corner keyboard adjustment, perspective pipeline and recovery.\n");
         }
         catch (Exception ex) { File.WriteAllText(System.IO.Path.Combine(directory, "ui-error.txt"), ex.ToString()); Environment.ExitCode = 1; }

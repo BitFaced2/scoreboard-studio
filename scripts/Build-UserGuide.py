@@ -79,7 +79,7 @@ def begin(number, title, subtitle):
     c.setStrokeColor(LINE); c.line(48, 43, 564, 43)
     c.setFont('TMS', 8); c.setFillColor(MUTED)
     c.drawString(48, 28, f'TMS Scoreboard Studio  /  v{VERSION}  /  Internal use')
-    c.drawRightString(564, 28, f'{number:02d} / 10')
+    c.drawRightString(564, 28, f'{number:02d} / 11')
     return y-18
 
 def heading(text, y, x=48, width=516):
@@ -120,7 +120,7 @@ para('SCOREBOARD<br/>STUDIO',48,472,516,43,white,True,leading=46)
 para('Live digits. Your graphics.',48,363,516,22,HexColor('#9FD1FF'))
 para('USER GUIDE',48,305,516,11,white,True)
 para('A practical guide to turning a scoreboard camera into clean,<br/>independent video fields for your vMix scorebug.',48,278,516,11,HexColor('#D4DFEA'))
-contents=[('02','Launch & find your way'),('03','Connect & separate fields'),('04','Straighten an angled camera'),('05','Clean up the digits'),('06','Build the vMix scorebug'),('07','Load your own recording'),('08','Save, rehearse & go live'),('09','Troubleshooting'),('10','Stabilization & reliability')]
+contents=[('02','Launch & find your way'),('03','Connect & separate fields'),('04','Straighten an angled camera'),('05','Clean up the digits'),('06','Build the vMix scorebug'),('07','Load your own recording'),('08','Save, rehearse & go live'),('09','Troubleshooting'),('10','Stabilization & reliability'),('11','Updating the app')]
 for i,(num,title) in enumerate(contents):
     x=48+(i%2)*270; y=203-(i//2)*27
     label(num,x,y,HexColor('#72BBFF'));para(title,x+29,y+10,225,9.5,white)
@@ -238,6 +238,14 @@ y=heading('If the app closes unexpectedly',y)
 y=para('Error logs are stored in <b>%LOCALAPPDATA%\\TMS Scoreboard Studio\\Diagnostics</b>. Paste that path into File Explorer. On a handled UI error, the app attempts to save a timestamped recovered setup there before closing. Native decoder or process termination failures may not allow recovery.',48,y)-16
 note('Playback checks and limits','Playback reuses rendering resources and skips unchanged-frame processing. Small-disturbance tracking has bounded search; it cannot follow a camera around the venue or restore missing detail. Save the setup regularly and test your actual camera and vMix composition.',y)
 
-assert len(pages)==10
+y=begin(11,'Updating the app','Check for a new release when you are ready to stop and restart the app.')
+y=picture(SHOT/'update-window.png',48,y,516,175)-12
+y=step(1,'Stop outputs and unlock editing','Finish any camera-corner edit. Click <b>Check for updates</b> in the bottom bar. Internet access is needed to check GitHub; no account is required. Published preview releases are included.',y)
+y=step(2,'Download and verify','When a newer version is available, click <b>Download update</b>. The app verifies the package against GitHub\'s checksum before offering to install. Downloading does not change your installed app.',y)
+y=step(3,'Install and restart','Click <b>Install and restart</b>, then save unsaved setup changes when prompted. Keep the app folder writable and close other copies. Program files update in place; shortcuts, saved setups and recordings remain in place.',y)
+y=step(4,'Review your restored setup','The app reopens your saved setup with outputs stopped. Reconnect a live source and set stabilization again if needed. Check the picture and fields before restarting outputs.',y)
+note('Getting the updater for the first time','Versions before 0.5.0 need one final manual GitHub ZIP download. Extract it and open the new executable; no uninstall is needed. Later updates use this window. Failed downloads leave the app unchanged, and ordinary installation write failures restore the previous files. Use <b>GitHub downloads</b> in the update window for a manual fallback.',y)
+
+assert len(pages)==11
 c.save()
 print(f'Created {args.output} ({len(pages)} pages)')

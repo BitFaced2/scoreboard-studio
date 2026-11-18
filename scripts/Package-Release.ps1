@@ -17,7 +17,7 @@ try {
     dotnet build ScoreboardStudio.sln -c Release
     if ($LASTEXITCODE -ne 0) { throw 'Build failed.' }
     $taskCheckArgs = @('run', '--project', 'tests/ScoreboardStudio.Checks', '-c', 'Release', '--no-build')
-    if ($VerifyNdi -or $VerifyReferencePhoto) { $taskCheckArgs += '--' }
+    $taskCheckArgs += @('--', '--update-exe', 'src/ScoreboardStudio.App/bin/Release/net8.0-windows/ScoreboardStudio.exe')
     if ($VerifyNdi) { $taskCheckArgs += '--ndi' }
     if ($VerifyReferencePhoto) { $taskCheckArgs += @('--image', 'samples/real-scoreboard/scoreboard.png', 'samples/real-scoreboard/real-scoreboard.scoreboard.json', (Join-Path $taskRun 'image-checks')) }
     & dotnet @taskCheckArgs

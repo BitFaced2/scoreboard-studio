@@ -9,6 +9,25 @@ namespace ScoreboardStudio.App;
 /// </summary>
 public partial class App : Application
 {
+    protected override async void OnStartup(StartupEventArgs e)
+    {
+        int installer=Array.IndexOf(e.Args,"--apply-update");
+        if(installer>=0)
+        {
+            ShutdownMode=ShutdownMode.OnExplicitShutdown;
+            try {Shutdown(await AppUpdate.ApplyAsync(e.Args[installer+1]));}
+            catch(Exception ex) {Diagnostics.Log("Update helper",ex);Shutdown(1);}
+            return;
+        }
+        if(e.Args.Contains("--update-test-wait"))
+        {
+            ShutdownMode=ShutdownMode.OnExplicitShutdown;
+            await Task.Delay(1500);Shutdown(0);
+            return;
+        }
+        base.OnStartup(e);
+        MainWindow=new MainWindow();MainWindow.Show();
+    }
     internal bool FatalError { get; private set; }
     public App()
     {

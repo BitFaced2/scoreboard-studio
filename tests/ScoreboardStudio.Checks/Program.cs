@@ -195,6 +195,8 @@ Check("Video engine applies perspective before field cropping and keeps raw prev
 
 Check("Stabilization corrects camera motion, rejects lost tracking, and reacquires the original reference", StabilizationChecks.MotionAndRecovery);
 Check("Stabilization retains field geometry, clears lost output, and reuses unchanged frames", StabilizationChecks.EngineKeepsFields);
+int updaterIndex=Array.IndexOf(args,"--update-exe");
+UpdateChecks.Register(Check,updaterIndex>=0&&updaterIndex+1<args.Length?args[updaterIndex+1]:null);
 
 if(args.Contains("--ndi"))
 {

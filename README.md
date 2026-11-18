@@ -1,6 +1,6 @@
 # TMS Scoreboard Studio
 
-A Windows desktop prototype that crops a real scoreboard camera feed into live, transparent video fields for a vMix scorebug. It preserves the physical scoreboard's digits. It does not read or regenerate scores and uses no OCR, AI model, cloud service, or paid image-processing library.
+A Windows desktop prototype that crops a real scoreboard camera feed into live, transparent video fields for a vMix scorebug. It preserves the physical scoreboard's digits. The scoreboard processing does not read or regenerate scores and uses no OCR, AI model, cloud service, or paid image-processing library.
 
 The desktop interface uses Total Media Sports branding, with the supplied logo embedded in the application, blue action buttons, and red navigation accents. Existing setup files and NDI source names remain compatible.
 
@@ -17,6 +17,16 @@ The first source in a fresh app session automatically gets an initial set of fie
 Setups remember a relative image or video path so they can restore the source. Media is referenced, not embedded: copy it along with the setup when moving computers. Loading a setup never starts outputs automatically. A paused video, or a video that reaches the end with Loop disabled, holds its last frame until you resume or restart.
 
 The TMS PDF user guide covers the internal workflow. Source test fixtures in `samples` are developer checks and are not included in the application package.
+
+## Updates
+
+Version 0.5.0 adds **Check for updates** in the bottom bar. Older versions need one final manual download: extract the new Windows ZIP and open its executable. This is a portable app; no uninstall or installer is required.
+
+Stop NDI outputs, unlock editing, then choose **Check for updates → Download update → Install and restart**. The app checks this repository's published releases (including previews), verifies the ZIP's SHA-256 digest from GitHub, and stages the new files before closing. Unsaved changes trigger the normal save prompt. It replaces only program files in the existing folder, so existing shortcuts keep working and saved layouts/media remain untouched. The app restarts into your saved setup with outputs stopped; reconnect the live source and set stabilization again if needed.
+
+Failed downloads leave the installed app unchanged. Installation backs up replaced files and rolls back ordinary write failures; the backup is removed after a successful restart. The folder must be writable, and other copies of the same app must be closed. Error details go to the Diagnostics folder described below. An interrupted process or power loss may require restoring the retained `.update-backup-*` folder manually.
+
+Checks occur only when requested. The updater contacts GitHub to fetch release metadata and the Windows ZIP; it does not upload footage or setups, download sample video, or require a GitHub login. Network or rate-limit errors can be retried, and the update window also links to manual GitHub downloads. It uses GitHub's official [release listing](https://docs.github.com/en/rest/releases/releases#list-releases) and [release asset metadata](https://docs.github.com/en/rest/releases/assets#get-a-release-asset).
 
 ## Angled cameras
 
@@ -89,6 +99,8 @@ powershell -ExecutionPolicy Bypass -File scripts/Package-Release.ps1 -VerifyRefe
 ```
 
 The normal console checks require neither NDI nor the reference photo. `--ndi` additionally exercises an installed runtime with actual discovery, receive, cleaned output, alpha, signal loss, and recovery. `--image` requires the optional reference photo and produces a comparison sheet, detection overlay, and perspective example. The WPF executable also supports `--smoke-test <output-directory>` to exercise field selection/rename/crop/cleanup and render the work areas to PNG. Pass `--test-layout <photo-layout.json>` to supply a photo fixture for field editing and perspective apply/cancel/reset. `--video-smoke-test <directory> --video-file <clip.mp4> --test-layout <layout.json> --ndi` checks direct video decoding, pause/restart/loop, persistence, NDI output, source switching and invalid media; omit `--ndi` when no runtime is available. These tests publish temporary local NDI sources only when `--ndi` is explicitly used.
+
+Updater checks run with `--update-exe <built-ScoreboardStudio.exe>` in the console harness (included by the release packaging script). The portable app supports `--update-smoke-test <empty-output-directory> --update-package <current-release.zip>` to verify a real GitHub download, helper shutdown/wait, installation, restart, setup restoration and locked-file rollback in a disposable app copy. This test downloads the current public release and launches temporary local app processes. Add `--update-ui-check` to the UI smoke test to check the update window and live-editing guard.
 
 The `Core` project contains pixels, detection, layout persistence, the worker pipeline, and the NDI native bindings. The `App` project is the WPF desktop editor. `Checks` is a dependency-free console verification harness.
 
