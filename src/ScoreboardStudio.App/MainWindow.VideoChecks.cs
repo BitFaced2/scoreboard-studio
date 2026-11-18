@@ -34,13 +34,44 @@ public partial class MainWindow
             Require(initial.Width<=1280 && initial.Height<=720,"Video exceeded the processing size limit.");
             await Task.Delay(1000);
             Require(engine.Preview.RawSource!.Pixels.Where((_,i)=>i%4!=3).Average(b=>(double)b)>5,"Decoded video was black.");
-            await Until(()=>fields.Count>0 && engine.Preview.Fields.Count==fields.Count,"Loading video did not automatically create usable fields.");
+            Require(fields.Count==0,"Video loading placed fields without operator approval.");
+            DetectClick(this,new());
+            await Until(()=>AcceptDetection.Visibility==Visibility.Visible,"Find fields did not produce suggestions.");
+            Require(fields.Count==0,"Detection replaced fields before acceptance.");
+            AcceptDetectionClick(this,new());
+            await Until(()=>fields.Count>0 && engine.Preview.Fields.Count==fields.Count,"Accepted fields were not processed.");
             if(Arg("--expect-auto-fields") is {} expected)Require(fields.Count==int.Parse(expected),$"Expected {expected} automatic fields, got {fields.Count}.");
             RefreshPreview();UpdateLayout();CaptureWindow(System.IO.Path.Combine(directory,"automatic-fields.png"));
-            report.Add($"PASS: video load automatically created {fields.Count} editable fields without a detection click.");
+            report.Add($"PASS: video load preserved an empty layout; operator accepted {fields.Count} suggested fields.");
             if(Arg("--test-layout") is {} layoutPath) OpenLayout(layoutPath);
             var savedRegions=fields.Select(f=>f.Region).ToArray();await Task.Delay(900);
             Require(fields.Select(f=>f.Region).SequenceEqual(savedRegions),"Automatic detection overwrote a loaded layout.");
+            SetReferenceClick(this,new());
+            await Until(()=>engine.Preview.StabilizationStatus.StartsWith("Stabilization ready")||engine.Preview.StabilizationStatus.StartsWith("Stabilizing"),"Reference capture failed: "+engine.Preview.StabilizationStatus);
+            var cameraFrame=engine.Preview.RawSource!;
+            var motionTracker=new CameraStabilizer();
+            Require(motionTracker.Process(cameraFrame,stabilization.Area).Healthy,"Recorded image cannot establish a tracking reference.");
+            var shaken=CameraStabilizer.Warp(cameraFrame,1,0,-12,8);
+            Require(motionTracker.Process(shaken,stabilization.Area).Healthy,"Recorded image could not track a simulated camera shake.");
+            var measured=motionTracker.Transform;
+            Require(Math.Abs(measured.X-12)<3&&Math.Abs(measured.Y+8)<3,"Recorded camera shake was not corrected accurately.");
+            report.Add("PASS: simulated camera shake on the real recording recovered within three source pixels.");
+            int seconds=int.TryParse(Arg("--soak-seconds"),out var requested)?Math.Clamp(requested,3,600):3;
+            var process=Process.GetCurrentProcess();process.Refresh();long memoryStart=process.PrivateMemorySize64;
+            int healthyFrames=0,samples=0;double processingTotal=0;
+            for(int sample=0;sample<seconds*5;sample++)
+            {
+                await Task.Delay(200);samples++;
+                if(engine.Preview.Healthy)healthyFrames++;
+                processingTotal+=engine.Preview.ProcessingMs;
+                Require(fields.Select(f=>f.Region).SequenceEqual(savedRegions),"Playback or stabilization moved operator fields.");
+            }
+            process.Refresh();long memoryEnd=process.PrivateMemorySize64;
+            report.Add($"Playback soak: {seconds}s, {healthyFrames}/{samples} tracked frames, processing {processingTotal/samples:0.0} ms average; private memory {memoryStart/1048576} -> {memoryEnd/1048576} MiB.");
+            Require(healthyFrames>=samples*.8,"Stabilization lost the stationary recorded scoreboard too often: "+engine.Preview.StabilizationStatus);
+            Require(memoryEnd-memoryStart<250L*1024*1024,"Playback memory grew by more than 250 MiB during the soak.");
+            StabilizeClick(this,new());
+            await Task.Delay(300);
             await Until(()=>engine.Preview.Fields.Count==fields.Count,"Video crops were not produced.");
             var previous=Hash(engine.Preview.Fields[fields[0].Id]);
             await Until(()=>Hash(engine.Preview.Fields[fields[0].Id])!=previous,"Cleaned video did not update.");

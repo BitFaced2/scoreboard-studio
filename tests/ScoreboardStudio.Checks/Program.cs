@@ -193,6 +193,9 @@ Check("Video engine applies perspective before field cropping and keeps raw prev
     Require(engine.Preview.Fields[field.Id] is { Width:50,Height:25 },"Crop happened before perspective correction.");
 });
 
+Check("Stabilization corrects camera motion, rejects lost tracking, and reacquires the original reference", StabilizationChecks.MotionAndRecovery);
+Check("Stabilization retains field geometry, clears lost output, and reuses unchanged frames", StabilizationChecks.EngineKeepsFields);
+
 if(args.Contains("--ndi"))
 {
     Check("NDI discovery, video receive, alpha output, signal loss, and recovery", () =>

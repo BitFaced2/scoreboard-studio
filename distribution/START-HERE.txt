@@ -1,4 +1,4 @@
-TMS SCOREBOARD STUDIO 0.3.1 - INTERNAL USE
+TMS SCOREBOARD STUDIO 0.4.0 - INTERNAL USE
 
 START
 
@@ -15,26 +15,47 @@ Recordings play automatically with audio muted. Pause / Play, Restart and
 Loop video controls appear below the filename. Pausing holds the last frame.
 If looping is off, the final frame remains until you restart the recording.
 
-Fields are detected and created automatically when no fields exist yet.
-Review and name the boxes, or Load setup to restore your own crops and cleanup.
+Draw fields yourself, or click Find fields and review the amber suggestions.
+Only Replace fields with suggestions replaces your boxes. Loading, camera
+motion, and looping do not place or move fields. Load setup restores your crops.
 Save setup remembers the selected image or video by relative path. Copy the
 media with the setup when moving computers. Files are not embedded in layouts.
 
 PREPARE THE FIELDS
 
 For an angled camera, use Fields > Straighten camera, place the four numbered
-corners, choose the corrected size and click Apply. Review the automatically created boxes, leaving room for changing digits.
+corners, choose the corrected size and click Apply. Leave room for changing digits.
 Name each field and draw a box around any field that was missed.
-Auto-detect fields provides suggestions you can review and adjust.
+Find fields provides suggestions you can review and accept explicitly.
+The corner editor freezes the picture. Drag a dot or label directly, or select
+a corner and use arrow keys to fine-tune (Shift = 10 pixels).
 
 Straightening does not delete fields. To remove one, select it under Your
 fields and click Remove selected field at the bottom left. After changing
-the view, resize the remaining boxes or Auto-detect fields > Use suggestions
+the view, resize the remaining boxes or Find fields > Replace fields with suggestions
 to rebuild them. Save setup when finished.
 
 Open Cleanup and compare the original and cleaned pixels. Use Bright colors
 for red/amber LEDs on dark panels, or White highlights for white digit cores
 surrounded by colored glow. Adjust Background cutoff and Edge softness.
+
+CAMERA STABILIZATION
+
+After setup, click Stabilize camera to capture a reference. Review the crops,
+then start outputs. Small shifts, rotation and zoom are corrected beneath your
+fixed boxes. Tracking needs visible detail around the board. Tracking loss
+clears outputs until the reference is found again. For a large camera move,
+stop stabilization, realign the board and fields, then enable it again.
+Set reference explicitly captures a new view and stops outputs for review.
+Changing sources or loading a setup disables stabilization; references are
+session-only. Stabilization does not run field detection.
+
+WINDOW AND DIAGNOSTICS
+
+Use the Windows title bar or header buttons to minimize/maximize/restore.
+Drag the window edges to resize; smaller windows scroll to reach the controls.
+Error logs and attempted UI-crash setup recovery are stored in:
+%LOCALAPPDATA%\TMS Scoreboard Studio\Diagnostics
 
 SEND TO VMIX
 

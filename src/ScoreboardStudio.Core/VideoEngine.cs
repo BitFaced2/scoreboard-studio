@@ -2,8 +2,8 @@ using System.Diagnostics;
 
 namespace ScoreboardStudio.Core;
 
-public sealed record EnginePlan(string Kind, NdiSource? Source, VideoFrame? Still, ScoreField[] Fields, bool Output, int Generation, PerspectiveSettings? Perspective = null, IPlaybackSource? Playback = null);
-public sealed record EnginePreview(VideoFrame? Source, IReadOnlyDictionary<Guid, VideoFrame> Fields, string Status, bool Healthy, int OutputCount, double ProcessingMs, VideoFrame? RawSource = null, int Generation = -1);
+public sealed record EnginePlan(string Kind, NdiSource? Source, VideoFrame? Still, ScoreField[] Fields, bool Output, int Generation, PerspectiveSettings? Perspective = null, IPlaybackSource? Playback = null, StabilizationSettings? Stabilization = null);
+public sealed record EnginePreview(VideoFrame? Source, IReadOnlyDictionary<Guid, VideoFrame> Fields, string Status, bool Healthy, int OutputCount, double ProcessingMs, VideoFrame? RawSource = null, int Generation = -1, string StabilizationStatus = "Stabilization off");
 
 // All receivers and senders belong to this worker; the UI only exchanges immutable snapshots.
 public sealed class VideoEngine : IDisposable
@@ -13,7 +13,8 @@ public sealed class VideoEngine : IDisposable
     private readonly CancellationTokenSource cancellation = new();
     private readonly Task worker;
     public EnginePreview Preview => Volatile.Read(ref preview);
-    public VideoEngine() => worker = Task.Run(Run);
+    private readonly Action<Exception>? reportError;
+    public VideoEngine(Action<Exception>? reportError = null) { this.reportError=reportError; worker = Task.Run(Run); }
     public void Configure(EnginePlan value) => Volatile.Write(ref plan, value);
     private async Task Run()
     {
@@ -22,6 +23,12 @@ public sealed class VideoEngine : IDisposable
         var clock = Stopwatch.StartNew();
         int generation = -1;
         VideoFrame? latest = null;
+        CameraStabilizer? stabilizer=null;
+        int reference=-1;
+        VideoFrame? cachedInput=null, cachedWorking=null, aligned=null;
+        EnginePlan? cachedPlan=null;
+        bool cachedHealthy=false;
+        Dictionary<Guid,VideoFrame> cachedFields=[];
         double lastReceived = -10, retryAt = 0;
         try
         {
@@ -38,6 +45,7 @@ public sealed class VideoEngine : IDisposable
                         { try { sender.Send(new(2, 2, new byte[16])); } catch { } sender.Dispose(); }
                         senders.Clear();
                         generation = current.Generation; latest = null; lastReceived = -10; retryAt = 0;
+                        stabilizer=null; reference=-1; cachedInput=null; cachedPlan=null; cachedWorking=null; aligned=null; cachedFields=[];
                     }
                     bool healthy = false;
                     string status = "Choose a source";
@@ -59,15 +67,40 @@ public sealed class VideoEngine : IDisposable
                             status = healthy ? "LIVE • " + current.Source!.Name : "NO SIGNAL • Outputs are transparent; waiting for source";
                             break;
                     }
-                    var working = latest is not null && current.Perspective is { Enabled: true } correction
-                        ? PerspectiveTransform.Apply(latest, correction) : latest;
-                    var fields = new Dictionary<Guid, VideoFrame>();
-                    foreach (var field in current.Fields)
+                    string tracking="Stabilization off";
+                    var input=latest;
+                    if(current.Stabilization is {Enabled:true} settings && latest is not null)
                     {
-                        if (working is null) continue;
-                        var processed = FrameProcessor.Process(working, field.Region, field.Cleanup);
-                        if (!healthy) Array.Clear(processed.Pixels);
-                        fields[field.Id] = processed;
+                        if(stabilizer is null || reference!=settings.Reference) { stabilizer=new(); reference=settings.Reference; aligned=null; }
+                        if(healthy)
+                        {
+                            var result=stabilizer.Process(latest,settings.Area);
+                            tracking=result.Status;
+                            healthy=result.Healthy;
+                            if(result.Frame is not null)aligned=result.Frame;
+                            if(!healthy)status="TRACKING LOST • Outputs transparent";
+                        }
+                        else tracking="Stabilization waiting for source";
+                        input=aligned ?? latest;
+                    }
+                    else { stabilizer=null; reference=-1; aligned=null; }
+                    VideoFrame? working;
+                    Dictionary<Guid,VideoFrame> fields;
+                    if(ReferenceEquals(input,cachedInput) && ReferenceEquals(current,cachedPlan) && healthy==cachedHealthy)
+                    { working=cachedWorking; fields=cachedFields; }
+                    else
+                    {
+                        working = input is not null && current.Perspective is { Enabled: true } correction
+                            ? PerspectiveTransform.Apply(input, correction) : input;
+                        fields = new Dictionary<Guid, VideoFrame>();
+                        foreach (var field in current.Fields)
+                        {
+                            if (working is null) continue;
+                            var processed = FrameProcessor.Process(working, field.Region, field.Cleanup);
+                            if (!healthy) Array.Clear(processed.Pixels);
+                            fields[field.Id] = processed;
+                        }
+                        cachedInput=input;cachedPlan=current;cachedHealthy=healthy;cachedWorking=working;cachedFields=fields;
                     }
                     var wanted = current.Output && latest is not null
                         ? current.Fields.Where(f => f.Enabled && fields.ContainsKey(f.Id)).ToArray() : [];
@@ -85,10 +118,12 @@ public sealed class VideoEngine : IDisposable
                         if (!senders.ContainsKey(field.Id)) senders[field.Id] = new NdiSender(OutputName(current.Kind, field.Name));
                         senders[field.Id].Send(fields[field.Id]);
                     }
-                    Volatile.Write(ref preview, new(working, fields, status, healthy, senders.Count, clock.Elapsed.TotalMilliseconds - start, latest, generation));
+                    Volatile.Write(ref preview, new(working, fields, status, healthy, senders.Count, clock.Elapsed.TotalMilliseconds - start, input, generation, tracking));
                 }
                 catch (Exception ex)
                 {
+                    reportError?.Invoke(ex);
+                    cachedPlan=null; cachedInput=null; cachedWorking=null; cachedFields=[];
                     foreach (var sender in senders.Values)
                     { try { sender.Send(new(2, 2, new byte[16])); } catch { } sender.Dispose(); }
                     senders.Clear(); receiver?.Dispose(); receiver = null; latest = null;

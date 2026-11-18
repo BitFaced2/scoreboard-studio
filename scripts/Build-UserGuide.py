@@ -79,7 +79,7 @@ def begin(number, title, subtitle):
     c.setStrokeColor(LINE); c.line(48, 43, 564, 43)
     c.setFont('TMS', 8); c.setFillColor(MUTED)
     c.drawString(48, 28, f'TMS Scoreboard Studio  /  v{VERSION}  /  Internal use')
-    c.drawRightString(564, 28, f'{number:02d} / 09')
+    c.drawRightString(564, 28, f'{number:02d} / 10')
     return y-18
 
 def heading(text, y, x=48, width=516):
@@ -120,7 +120,7 @@ para('SCOREBOARD<br/>STUDIO',48,472,516,43,white,True,leading=46)
 para('Live digits. Your graphics.',48,363,516,22,HexColor('#9FD1FF'))
 para('USER GUIDE',48,305,516,11,white,True)
 para('A practical guide to turning a scoreboard camera into clean,<br/>independent video fields for your vMix scorebug.',48,278,516,11,HexColor('#D4DFEA'))
-contents=[('02','Launch & find your way'),('03','Connect & separate fields'),('04','Straighten an angled camera'),('05','Clean up the digits'),('06','Build the vMix scorebug'),('07','Load your own recording'),('08','Save, rehearse & go live'),('09','Troubleshooting')]
+contents=[('02','Launch & find your way'),('03','Connect & separate fields'),('04','Straighten an angled camera'),('05','Clean up the digits'),('06','Build the vMix scorebug'),('07','Load your own recording'),('08','Save, rehearse & go live'),('09','Troubleshooting'),('10','Stabilization & reliability')]
 for i,(num,title) in enumerate(contents):
     x=48+(i%2)*270; y=203-(i//2)*27
     label(num,x,y,HexColor('#72BBFF'));para(title,x+29,y+10,225,9.5,white)
@@ -147,18 +147,18 @@ y=begin(3,'Connect & separate fields','Keep the camera fixed and frame the entir
 y=step(1,'Make the camera available over NDI','The dropdown lists <b>NDI feeds only</b>. Add a USB camera or capture card in vMix and enable NDI for its feed. Direct camera-device capture is not supported in this version.',y)
 y=step(2,'Select the source and connect','Click <b>Refresh</b>, choose the NDI feed and click <b>Connect</b>. For a local file, use <b>Load image or video</b>; an empty NDI dropdown is normal and does not prevent playback.',y)
 y=step(3,'Correct the angle first','If the board is tilted or trapezoidal, use <b>Straighten camera</b> before placing boxes. See page 4. Field coordinates refer to the corrected image.',y)
-y=step(4,'Review the automatic boxes','When no fields exist yet, loading a source automatically creates editable boxes. Drag inside a box to move it; drag its lower-right handle to resize. Use <b>+ Draw a field</b> for any missed field. Existing fields and loaded layouts are retained.',y)
+y=step(4,'Draw or find fields','Use <b>+ Draw a field</b>, or <b>Find fields</b> to preview amber suggestions. Only <b>Replace fields with suggestions</b> replaces your layout. Drag inside a box to move it; drag its lower-right handle to resize. Camera motion and playback never place boxes.',y)
 y=step(5,'Name and review each field','Use names such as Game Clock, Home Score and Period. Leave room for every possible digit, including a third score digit and a clock switching to tenths. Check <b>Include in NDI outputs</b> for the fields you want to send.',y)
-y=note('Rescan or undo','Initial detection runs automatically and selects an isolation mode and cutoff. To rescan, choose <b>Look for</b> and <b>Cutoff</b>, click <b>Auto-detect fields</b>, inspect its suggestions, then choose <b>Use suggestions</b>. <b>Undo detection</b> restores the prior field list.',y)
+y=note('Detection stays under your control','Choose <b>Look for</b> and <b>Cutoff</b>, then click <b>Find fields</b>. Review before accepting replacement. Editing your setup discards pending suggestions. <b>Undo detection</b> restores the field list from before acceptance.',y)
 para('To delete a field, select it under <b>Your fields</b> and click <b>Remove selected field</b> at the bottom left. Repeat as needed, then save. Detection creates editable boxes; it does not identify field meanings.',48,y,size=10,color=MUTED)
 
 # 04 / perspective
 y=begin(4,'Straighten an angled camera','Four corner points turn the selected scoreboard plane into a rectangle.')
-y=picture(SHOT/'perspective-editor.png',48,y,516,255)-10
+y=picture(SHOT/'perspective-editor.png',48,y,516,230)-10
 y=para('The numbered handles are ordered around the board: top left, top right, bottom right, bottom left.',48,y,516,9,MUTED)-15
-y=step(1,'Choose Fields > Straighten camera','Drag each numbered point to the matching corner of the scoreboard. Keep the points in order and do not cross the edges.',y)
-y=step(2,'Set the corrected size and apply','Choose width and height matching the board\'s proportions, then click <b>Apply</b>. Existing boxes are retained, even if you cut a display out of the view. Remove unwanted fields and resize the rest, or use <b>Auto-detect fields → Use suggestions</b> to rebuild them. <b>Cancel</b> keeps the previous correction; <b>Reset correction</b> restores the original geometry.',y)
-note('Review before restarting outputs','Opening this editor stops NDI outputs. Finish or cancel the edit, review the fields, and start outputs explicitly. Correction is fixed: if the camera moves, realign it. It cannot recover missing detail or correct lens distortion.',y)
+y=step(1,'Choose Fields > Straighten camera','The picture freezes while you edit. Drag a numbered dot or its label directly; no preliminary click is needed. Select a corner and use arrow keys for one-pixel adjustments, or Shift plus arrows for ten pixels. Keep the corners in order.',y)
+y=step(2,'Set the corrected size and apply','Choose width and height matching the board\'s proportions, then click <b>Apply</b>. Existing boxes are retained. Remove unwanted fields and resize the rest, or use <b>Find fields → Replace fields with suggestions</b>. <b>Cancel</b> keeps the previous correction; <b>Reset correction</b> restores the original geometry.',y)
+note('Review before restarting outputs','Opening this editor stops NDI outputs. Finish or cancel the edit, review the fields, and start outputs explicitly. Use stabilization for small camera disturbances (page 10); larger moves need realignment. Correction cannot recover detail or fix lens distortion.',y)
 
 # 05 / cleanup
 y=begin(5,'Clean up the digits','Select a field and open Cleanup. Compare the original with the transparent preview.')
@@ -190,10 +190,10 @@ para('vMix 29 references: <link href="https://www.vmix.com/help29/SettingsOutput
 # 07 / operator-supplied recording
 y=begin(7,'Load your own recording','Open a clip directly in Scoreboard Studio. No vMix input is needed for local playback.')
 y=picture(SHOT/'video-fields.png',48,y,516,245)-8
-y=para('A recorded scoreboard playing inside the app with four automatically detected fields.',48,y,516,8.5,MUTED)-15
+y=para('A recorded scoreboard playing inside the app with four operator-approved fields.',48,y,516,8.5,MUTED)-15
 y=step(1,'Load image or video','Select your own video file. Playback begins automatically with audio muted. H.264 MP4 is recommended; other offered containers depend on the codecs installed in Windows.',y)
 y=step(2,'Control playback','Use <b>Pause / Play</b> to hold or resume the picture, and <b>Restart</b> to return to the beginning. <b>Loop video</b> repeats the recording. With looping off, playback holds the final frame.',y)
-y=step(3,'Review and save your fields','Boxes appear automatically when no fields exist yet. Review them, name the fields and adjust cleanup. A saved setup remembers the video path and field settings. Loading a saved layout keeps its boxes.',y)
+y=step(3,'Review and save your fields','Draw fields, or use Find fields and accept the suggestions. Name them and adjust cleanup. A saved setup remembers the video path and field settings. Loading a saved layout keeps its boxes; playback does not replace them.',y)
 note('Use your own footage','No sample files are bundled. Copy your recording and saved layout to the studio computer together. The app fits video within 1280 × 720 for processing while preserving its aspect ratio. Start NDI outputs when you want to send the cleaned fields to vMix.',y)
 
 # 08 / live use
@@ -228,6 +228,16 @@ y=heading('Project & further help',y)
 y=para('<link href="https://github.com/BitFaced2/scoreboard-studio/releases" color="#005BAB">GitHub releases and downloads</link><br/>This guide covers v'+VERSION+'. Download the matching Windows ZIP and extract it before launch. Bring your own media and saved setup to the studio.',48,y,size=9.5)-10
 para(f'Prepared for Total Media Sports · November 2026<br/>Screenshots show the branded v{VERSION} preview. Recorded-camera checks use your supplied capture. No OCR, cloud account or model download is required.',48,y,size=8.5,color=MUTED)
 
-assert len(pages)==9
+y=begin(10,'Stabilization & reliability','Correct small camera disturbances while keeping your field boxes fixed.')
+y=step(1,'Set up, then stabilize','Frame the board, straighten it if needed and place your fields. Click <b>Stabilize camera</b>. The app captures a reference from the current view and corrects small shifts, rotation and zoom before cropping. Review alignment, then start outputs.',y)
+y=step(2,'Watch the tracking status','Tracking needs visible detail around the board. If it is lost, outputs become transparent. Returning the camera to the reference view allows recovery. Stabilization never redetects or moves your field boxes.',y)
+y=step(3,'Realign after a larger move','Stop stabilization, realign the perspective and fields, then enable stabilization again. <b>Set reference</b> explicitly captures a new view and stops outputs for review. References last only for this session; loading a setup or changing sources turns stabilization off.',y)
+y=heading('Resize or minimize the window',y)
+y=para('Use the Windows title-bar controls or the minimize and restore buttons in the app header. Drag a window edge to resize. Startup fits the available screen area; small windows scroll so controls remain reachable.',48,y)-18
+y=heading('If the app closes unexpectedly',y)
+y=para('Error logs are stored in <b>%LOCALAPPDATA%\\TMS Scoreboard Studio\\Diagnostics</b>. Paste that path into File Explorer. On a handled UI error, the app attempts to save a timestamped recovered setup there before closing. Native decoder or process termination failures may not allow recovery.',48,y)-16
+note('Playback checks and limits','Playback reuses rendering resources and skips unchanged-frame processing. Small-disturbance tracking has bounded search; it cannot follow a camera around the venue or restore missing detail. Save the setup regularly and test your actual camera and vMix composition.',y)
+
+assert len(pages)==10
 c.save()
 print(f'Created {args.output} ({len(pages)} pages)')

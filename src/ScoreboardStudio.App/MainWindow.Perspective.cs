@@ -10,6 +10,8 @@ namespace ScoreboardStudio.App;
 
 public partial class MainWindow
 {
+    private VideoFrame? perspectiveFrame;
+    private int selectedCorner;
     private static VideoFrame LoadImage(string path)
     {
         var decoder = BitmapDecoder.Create(new Uri(System.IO.Path.GetFullPath(path)), BitmapCreateOptions.PreservePixelFormat, BitmapCacheOption.OnLoad);
@@ -33,6 +35,7 @@ public partial class MainWindow
         // does not discard the operator's current source or geometry.
         VideoFrame? image = mediaPath is not null && !missing && layout.VideoPath is null ? LoadImage(mediaPath) : null;
         EndPerspectiveEditing();
+        ResetStabilization();
         output = false; OutputButton.Content = "Start NDI outputs"; generation++;
         fields.Clear(); foreach (var field in layout.Fields) fields.Add(field);
         perspective = layout.Perspective with { };
@@ -53,7 +56,8 @@ public partial class MainWindow
         DetectionIsolation.SelectedIndex = fields.FirstOrDefault()?.Cleanup.Isolation == "White highlights" ? 1 : 0;
         DetectionThreshold.Value = fields.FirstOrDefault()?.Cleanup.Threshold ?? 130;
         SyncFields(); PopulateInspector(); UpdatePerspectiveStatus(); PushPlan();
-        CancelAutomaticDetection();
+        CancelDetection();
+        DetectionHint.Text="";
         Notice.Text = missing ? "Setup loaded. Use Load image or video to locate the missing file: " + mediaPath
             : layout.SourceName is not null ? $"Setup loaded. Connect to {layout.SourceName}, then review the crops."
             : "Setup loaded. Review the fields before starting outputs.";
@@ -64,19 +68,24 @@ public partial class MainWindow
         if (locked || engine.Preview.RawSource is not { } frame || !engine.Preview.Healthy)
         { Notice.Text = "Connect a source or load an image or video before adjusting perspective."; return; }
         if (EditingPerspective) { EndPerspectiveEditing(); return; }
-        CancelAutomaticDetection();
+        CancelDetection();
+        perspectiveFrame=frame;
+        selectedCorner=0;
         output = false; OutputButton.Content = "Start NDI outputs";
         drawing = false; draft = null; DrawButton.Content = "+ Draw a field";
         suggestions.Clear(); AcceptDetection.Visibility = Visibility.Collapsed;
         perspectiveDraft = perspective.Enabled ? perspective with { } : new() {
-            Enabled=true, Width=Math.Min(frame.Width,4096), Height=Math.Min(frame.Height,2160)
+            Enabled=true, Width=Math.Min(frame.Width,4096), Height=Math.Min(frame.Height,2160),
+            TopLeft=new(.05,.05),TopRight=new(.95,.05),BottomRight=new(.95,.95),BottomLeft=new(.05,.95)
         };
         PerspectiveWidth.Text = perspectiveDraft.Width.ToString(); PerspectiveHeight.Text = perspectiveDraft.Height.ToString();
         PerspectiveControls.Visibility = Visibility.Visible;
         DetectionOptions.Visibility = DetectionHint.Visibility = DetectButton.Visibility = Visibility.Collapsed;
+        StabilizeButton.IsEnabled=ReferenceButton.IsEnabled=false;
         PerspectiveButton.Content = "Cancel straightening";
         DetectButton.IsEnabled = DetectionOptions.IsEnabled = FieldActions.IsEnabled = Inspector.IsEnabled = FieldList.IsEnabled = SourceControls.IsEnabled = false;
         WorkspaceTabs.SelectedIndex = 0;
+        UpdateLayout();
         Notice.Text = "Outputs are stopped while you adjust perspective. Mark the board's four corners, then apply and review your field boxes.";
         PushPlan(); RefreshPreview(); RenderBoxes();
     }
@@ -105,11 +114,12 @@ public partial class MainWindow
 
     private void EndPerspectiveEditing()
     {
-        dragging = false; cornerDragging = -1; BoxCanvas.ReleaseMouseCapture(); perspectiveDraft = null;
+        dragging = false; cornerDragging = -1; BoxCanvas.ReleaseMouseCapture(); perspectiveDraft = null;perspectiveFrame=null;
         PerspectiveControls.Visibility = Visibility.Collapsed; PerspectiveButton.Content = "Straighten camera";
         DetectionOptions.Visibility = DetectionHint.Visibility = DetectButton.Visibility = Visibility.Visible;
         DetectButton.IsEnabled = DetectionOptions.IsEnabled = FieldActions.IsEnabled = SourceControls.IsEnabled = !locked;
         FieldList.IsEnabled = true; Inspector.IsEnabled = !locked && Selected is not null;
+        StabilizeButton.IsEnabled=!locked;ReferenceButton.IsEnabled=!locked && stabilization.Enabled;
         UpdatePerspectiveStatus(); RenderBoxes();
     }
 
@@ -129,14 +139,39 @@ public partial class MainWindow
         string[] labels = ["1  TOP LEFT", "2  TOP RIGHT", "3  BOTTOM RIGHT", "4  BOTTOM LEFT"];
         for (int i=0; i<4; i++)
         {
-            double x=corners[i].X*width, y=corners[i].Y*height, radius=width*.018;
-            var grip = new Ellipse { Width=radius*2,Height=radius*2,Fill=color,Stroke=Brush("#10251F"),StrokeThickness=3,IsHitTestVisible=false };
+            double x=corners[i].X*width, y=corners[i].Y*height, radius=CanvasUnits(13);
+            var grip = new Ellipse { Width=radius*2,Height=radius*2,Fill=color,Stroke=Brush(i==selectedCorner?"#FFFFFF":"#10251F"),StrokeThickness=CanvasUnits(2),Tag=i,Cursor=System.Windows.Input.Cursors.SizeAll };
             Canvas.SetLeft(grip,x-radius); Canvas.SetTop(grip,y-radius); BoxCanvas.Children.Add(grip);
-            var label = new Border { Background=color, Padding=new Thickness(8,4,8,4), IsHitTestVisible=false,
-                Child=new TextBlock { Text=labels[i],FontSize=Math.Max(18,width/64),FontWeight=FontWeights.Bold,Foreground=Brush("#10251F") } };
+            var label = new Border { Background=color, Padding=new Thickness(CanvasUnits(5)),Tag=i,Cursor=System.Windows.Input.Cursors.SizeAll,
+                Child=new TextBlock { Text=labels[i],FontSize=CanvasUnits(11),FontWeight=FontWeights.Bold,Foreground=Brush("#10251F") } };
             Canvas.SetLeft(label,Math.Clamp(x-85,0,Math.Max(0,width-220))); Canvas.SetTop(label, y > height/2 ? Math.Max(0,y-radius-40) : Math.Min(height-40,y+radius+5));
             BoxCanvas.Children.Add(label);
         }
         PerspectiveStatus.Text = valid ? "Corner order: top left → top right → bottom right → bottom left" : reason;
+    }
+    private double CanvasUnits(double pixels)
+    {
+        if(!IsAncestorOf(BoxCanvas))return pixels*2;
+        var transform=BoxCanvas.TransformToAncestor(this);
+        var a=transform.Transform(new Point(0,0));var b=transform.Transform(new Point(1,0));
+        return pixels/Math.Max(.01,Math.Abs(b.X-a.X));
+    }
+    private void PreviewSizeChanged(object sender,SizeChangedEventArgs e)
+    { if(ready && EditingPerspective)RenderBoxes(); }
+    private void MoveCorner(int index,Core.NormalPoint point)
+    {
+        if(perspectiveDraft is null)return;
+        switch(index) {case 0:perspectiveDraft.TopLeft=point;break;case 1:perspectiveDraft.TopRight=point;break;case 2:perspectiveDraft.BottomRight=point;break;case 3:perspectiveDraft.BottomLeft=point;break;}
+        RenderBoxes();
+    }
+    private void CornerKeyDown(object sender,System.Windows.Input.KeyEventArgs e)
+    {
+        if(!EditingPerspective || locked)return;
+        var p=perspectiveDraft!.Corners()[selectedCorner];
+        double step=System.Windows.Input.Keyboard.Modifiers.HasFlag(System.Windows.Input.ModifierKeys.Shift)?10:1;
+        double dx=e.Key==System.Windows.Input.Key.Left?-step:e.Key==System.Windows.Input.Key.Right?step:0;
+        double dy=e.Key==System.Windows.Input.Key.Up?-step:e.Key==System.Windows.Input.Key.Down?step:0;
+        if(dx==0&&dy==0)return;
+        MoveCorner(selectedCorner,new(Math.Clamp(p.X+dx/VideoSurface.Width,0,1),Math.Clamp(p.Y+dy/VideoSurface.Height,0,1)));e.Handled=true;
     }
 }

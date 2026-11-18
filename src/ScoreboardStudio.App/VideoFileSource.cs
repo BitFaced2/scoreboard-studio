@@ -18,6 +18,8 @@ internal sealed class VideoFileSource : IPlaybackSource, IDisposable
     private bool disposed, opened, ended, failed;
     private readonly System.Diagnostics.Stopwatch opening = System.Diagnostics.Stopwatch.StartNew();
     private int width, height;
+    private RenderTargetBitmap? renderTarget;
+    private bool capturePending;
     public PlaybackSnapshot Snapshot => Volatile.Read(ref snapshot);
     public bool IsPlaying { get; private set; }
     public bool Loop { get; set; } = true;
@@ -44,6 +46,7 @@ internal sealed class VideoFileSource : IPlaybackSource, IDisposable
         double scale = Math.Min(1, Math.Min(1280.0/player.NaturalVideoWidth,720.0/player.NaturalVideoHeight));
         width = Math.Max(2,(int)Math.Round(player.NaturalVideoWidth*scale));
         height = Math.Max(2,(int)Math.Round(player.NaturalVideoHeight*scale));
+        renderTarget = new RenderTargetBitmap(width,height,96,96,PixelFormats.Pbgra32);
         using (var dc = visual.RenderOpen()) { dc.DrawRectangle(Brushes.Black,null,new Rect(0,0,width,height)); dc.DrawVideo(player,new Rect(0,0,width,height)); }
         opened = true; IsPlaying = true; timer.Start();
     }
@@ -57,7 +60,10 @@ internal sealed class VideoFileSource : IPlaybackSource, IDisposable
         }
         try
         {
-            var bitmap = new RenderTargetBitmap(width,height,96,96,PixelFormats.Pbgra32);
+            if (!IsPlaying && !capturePending) return;
+            capturePending=false;
+            var bitmap = renderTarget!;
+            bitmap.Clear();
             bitmap.Render(visual);
             var pixels = new byte[width*height*4]; bitmap.CopyPixels(pixels,width*4,0);
             // The drawing has an opaque black base, so its premultiplied pixels
@@ -73,28 +79,29 @@ internal sealed class VideoFileSource : IPlaybackSource, IDisposable
         if (!opened || disposed) return;
         if (IsPlaying) { player.Pause(); IsPlaying = false; }
         else { if (ended) player.Position = TimeSpan.Zero; ended=false; player.Play(); IsPlaying=true; }
-        UpdateStatus();
+        capturePending=true; UpdateStatus();
     }
     public void Restart()
     {
         if (!opened || disposed) return;
-        player.Position=TimeSpan.Zero; ended=false; player.Play(); IsPlaying=true; UpdateStatus();
+        player.Position=TimeSpan.Zero; ended=false; player.Play(); IsPlaying=true; capturePending=true; UpdateStatus();
     }
     public void Seek(TimeSpan position)
     {
         if (!opened || disposed) return;
-        player.Position=TimeSpan.FromTicks(Math.Clamp(position.Ticks,0,Duration.Ticks)); ended=false; UpdateStatus();
+        player.Position=TimeSpan.FromTicks(Math.Clamp(position.Ticks,0,Duration.Ticks)); ended=false; capturePending=true; UpdateStatus();
     }
     private void Ended(object? sender, EventArgs e)
     {
         if (disposed) return;
         if (Loop) { LoopsCompleted++; Restart(); }
-        else { player.Pause(); IsPlaying=false; ended=true; UpdateStatus(); }
+        else { player.Pause(); IsPlaying=false; ended=true; capturePending=true; UpdateStatus(); }
     }
     private void Failed(object? sender, ExceptionEventArgs e) => Fail("Cannot play this video. Try an H.264 MP4 supported by Windows. " + e.ErrorException.Message);
     private void Fail(string message)
     {
-        failed=true; timer.Stop(); opened=false; IsPlaying=false; player.Close();
+        failed=true; timer.Stop(); opened=false; IsPlaying=false; player.Close(); renderTarget=null;
+        Diagnostics.Log("Video playback", new InvalidOperationException(message));
         Volatile.Write(ref snapshot,new(null,message,false));
     }
     public void Dispose()
@@ -102,7 +109,7 @@ internal sealed class VideoFileSource : IPlaybackSource, IDisposable
         if(disposed) return;
         disposed=true; timer.Stop(); timer.Tick-=Tick;
         player.MediaOpened-=Opened; player.MediaFailed-=Failed; player.MediaEnded-=Ended;
-        player.Close(); IsPlaying=false; opened=false;
+        player.Close(); renderTarget=null; IsPlaying=false; opened=false;
         Volatile.Write(ref snapshot,new(null,"Video closed",false));
     }
 }
