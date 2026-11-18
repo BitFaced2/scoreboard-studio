@@ -1,4 +1,4 @@
-TMS SCOREBOARD STUDIO 0.4.0 - INTERNAL USE
+TMS SCOREBOARD STUDIO 0.4.1 - INTERNAL USE
 
 START
 
@@ -15,9 +15,12 @@ Recordings play automatically with audio muted. Pause / Play, Restart and
 Loop video controls appear below the filename. Pausing holds the last frame.
 If looping is off, the final frame remains until you restart the recording.
 
-Draw fields yourself, or click Find fields and review the amber suggestions.
-Only Replace fields with suggestions replaces your boxes. Loading, camera
-motion, and looping do not place or move fields. Load setup restores your crops.
+The first source in a fresh app session gets automatic field boxes once.
+After that, they stay fixed. Click + Draw a field, then drag a rectangle to add
+a box. Select a box and click Remove selected field to delete it. Editing,
+deleting all fields, reconnecting or looping never restarts automatic placement.
+Load setup restores your crops, including an intentionally empty field list.
+To rescan explicitly, use Find fields > Replace fields with suggestions.
 Save setup remembers the selected image or video by relative path. Copy the
 media with the setup when moving computers. Files are not embedded in layouts.
 

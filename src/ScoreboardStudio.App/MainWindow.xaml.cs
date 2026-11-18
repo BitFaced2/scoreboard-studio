@@ -76,9 +76,9 @@ public partial class MainWindow : Window
     }
 
     private void PushPlan() => engine.Configure(new(kind, source, still, fields.Select(f => f.Snapshot()).ToArray(), output, generation, perspective with { }, video, stabilization));
-    private void Changed()
+    private void Changed(bool preserveInitialPlacement = false)
     {
-        CancelDetection();
+        CancelDetection(cancelInitial: !preserveInitialPlacement);
         dirty = true;
         SetupTitle.Text = setupName + " • Unsaved changes";
         PushPlan();
@@ -116,7 +116,12 @@ public partial class MainWindow : Window
             VideoTime.Text = $"{video.Position:mm\\:ss} / {video.Duration:mm\\:ss}";
         }
         var preview = engine.Preview;
-        EmptyFieldsText.Text=preview.Healthy ? "Draw a field, or click Find fields and review the suggestions. Your boxes stay where you put them." : "Load an image or video, or connect an NDI source, then draw or find fields.";
+        if(!initialPlacementFinished && fields.Count==0 && preview.Generation==generation && preview.Healthy && preview.Source is not null && !locked && !drawing && !EditingPerspective)
+        {
+            initialPlacementFinished=true;
+            _=PlaceInitialFields(generation,detectionRevision);
+        }
+        EmptyFieldsText.Text=preview.Healthy ? "Use + Draw a field to add a box, or Find fields to rescan. Your boxes stay where you put them." : "Load an image or video, or connect NDI. A fresh setup finds its initial fields once.";
         StabilizationStatus.Text = preview.StabilizationStatus;
         SignalText.Text = preview.Status;
         SignalBanner.Background = Brush(kind == "None" ? "#17304A" : preview.Healthy ? kind == "NDI" ? "#173D32" : "#40331E" : "#4C2429");
@@ -167,7 +172,7 @@ public partial class MainWindow : Window
 
     private void SwitchSource(string newKind, NdiSource? newSource = null, VideoFrame? image = null)
     {
-        CancelDetection();
+        CancelDetection(cancelInitial:false);
         ResetStabilization();
         video?.Dispose(); video = null; videoPath = null; VideoControls.Visibility = Visibility.Collapsed;
         output = false; OutputButton.Content = "Start NDI outputs";
@@ -176,7 +181,7 @@ public partial class MainWindow : Window
         EndPerspectiveEditing();
         suggestions.Clear(); AcceptDetection.Visibility = Visibility.Collapsed; beforeDetection = null; UndoDetection.Visibility = Visibility.Collapsed;
         drawing = false; DrawButton.Content = "+ Draw a field";
-        SyncFields(); Changed();
+        SyncFields(); Changed(preserveInitialPlacement:true);
         Notice.Text = newKind == "NDI" ? "Source connected. Review every crop before starting outputs." : newKind == "Image" ? "Image loaded. Draw fields or load a saved setup." : "Video loaded. Draw fields or load a saved setup.";
         if (perspective.Enabled) Notice.Text += " Perspective correction is retained; review its corners for this source.";
     }
@@ -545,13 +550,13 @@ public partial class MainWindow : Window
             var fixture=Layout.Load(fixturePath);
             string photoPath=System.IO.Path.GetFullPath(fixture.ImagePath!,System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(fixturePath))!);
             LoadMedia(photoPath);
-            await Task.Delay(1200);
-            if(fields.Count!=0)throw new Exception("Image load automatically placed fields without approval.");
-            DetectionIsolation.SelectedIndex=1;DetectionThreshold.Value=170;
-            DetectClick(this,new());
-            for(int i=0;i<100 && suggestions.Count==0;i++)await Task.Delay(100);
-            if(suggestions.Count==0 || fields.Count!=0)throw new Exception("Detection must preview suggestions without replacing fields.");
-            AcceptDetectionClick(this,new());
+            for(int i=0;i<100 && fields.Count==0;i++)await Task.Delay(100);
+            if(fields.Count==0 || !initialPlacementFinished)throw new Exception("A fresh source did not place initial fields once.");
+            int detectedCount=fields.Count;
+            DrawClick(this,new());draft=new(.02,.02,.08,.08);dragging=true;
+            CanvasUp(this,new MouseButtonEventArgs(Mouse.PrimaryDevice,0,MouseButton.Left));
+            if(fields.Count!=detectedCount+1 || Selected?.Region!=new Crop(.02,.02,.08,.08))throw new Exception("Draw a field did not add a manual box.");
+            RemoveClick(this,new());
             var acceptedFields=fields.Select(f=>f.Region).ToArray();
             DetectClick(this,new());
             fields[0].Region=new(.1,.1,.15,.2);Changed();
@@ -561,6 +566,17 @@ public partial class MainWindow : Window
             LoadMedia(photoPath);await Task.Delay(200);
             if(!fields.Select(f=>f.Region).SequenceEqual(acceptedFields))throw new Exception("Reloading the source replaced the setup.");
             await Task.Delay(200);RefreshPreview();UpdateLayout();CaptureWindow(System.IO.Path.Combine(directory,"automatic-image-fields.png"));
+            fields.Clear();SyncFields();Changed();LoadMedia(photoPath);await Task.Delay(900);
+            if(fields.Count!=0)throw new Exception("Deleting all fields and reopening media restarted automatic placement.");
+            string emptyLayout=System.IO.Path.Combine(directory,"empty.scoreboard.json");
+            new Layout {ImagePath=photoPath}.Save(emptyLayout);
+            initialPlacementFinished=false; // Model loading an intentionally empty layout in a fresh session.
+            OpenLayout(emptyLayout);await Task.Delay(900);
+            if(fields.Count!=0 || !initialPlacementFinished)throw new Exception("An empty saved layout was automatically repopulated.");
+            var pendingInitial=PlaceInitialFields(generation,detectionRevision);
+            var manual=new ScoreField {Name="Manual during detection",Region=new(.1,.1,.1,.1)};
+            fields.Add(manual);SyncFields();Changed();await pendingInitial;
+            if(fields.Count!=1 || fields[0]!=manual)throw new Exception("An in-flight initial detection overwrote manual placement.");
             OpenLayout(fixturePath);
             for (int i = 0; i < 100 && engine.Preview.Fields.Count != 10; i++) await Task.Delay(100);
             if (engine.Preview.Fields.Count != 10) throw new Exception("Photo did not produce ten cleaned fields.");
@@ -610,7 +626,7 @@ public partial class MainWindow : Window
             if(perspective.Enabled) throw new Exception("Perspective reset failed.");
             string? recovery=SaveRecovery();
             if(recovery is null || Layout.Load(recovery).Fields.Count!=fields.Count)throw new Exception("Recovery setup could not be restored.");
-            File.WriteAllText(System.IO.Path.Combine(directory, "ui-checks.txt"), "PASS: laptop resize/minimize, empty startup, explicit detection and acceptance, photo selection, cleanup, rename, crop, all tabs, live lock, frozen perspective view, corner keyboard adjustment, perspective apply/cancel/reset and pipeline.\n");
+            File.WriteAllText(System.IO.Path.Combine(directory, "ui-checks.txt"), "PASS: initial automatic placement once; manual add/remove; no redetection after edits, deletion, reload or empty saved layout; pending detection cannot overwrite edits; laptop resize/minimize; cleanup, rename, crop, tabs, live lock; frozen perspective view, corner keyboard adjustment, perspective pipeline and recovery.\n");
         }
         catch (Exception ex) { File.WriteAllText(System.IO.Path.Combine(directory, "ui-error.txt"), ex.ToString()); Environment.ExitCode = 1; }
         finally { dirty = false; Close(); }

@@ -12,7 +12,9 @@ Choose **Load image or video** to select your own PNG, JPEG, BMP or recorded vid
 
 For a live feed, select an NDI source and click **Connect**. The dropdown lists NDI feeds only; USB cameras and capture cards must first be exposed as NDI through vMix or another sender. An empty list does not affect local file playback. NDI input/output requires an installed runtime; local image/video processing does not. The app checks the standard vMix runtime location automatically.
 
-Fields are placed only by the operator: draw them manually or click **Find fields**, inspect the amber suggestions, then click **Replace fields with suggestions**. Loading, reconnecting, camera movement, and video looping never replace your boxes. Pending detection results are discarded if you edit the setup. Setups remember a relative image or video path so they can restore the source. Media is referenced, not embedded: copy it along with the setup when moving computers. Loading a setup never starts outputs automatically. A paused video, or a video that reaches the end with Loop disabled, holds its last frame until you resume or restart.
+The first source in a fresh app session automatically gets an initial set of field boxes. That pass runs once; afterward, boxes stay fixed until you edit them. Use **+ Draw a field** to drag out another box, or select one and click **Remove selected field**. Editing, deleting all fields, reconnecting, camera movement, and video looping never restart automatic placement. Loading a saved layout, including an empty one, skips initial detection. Pending results are discarded if you begin editing. To explicitly rescan later, click **Find fields**, inspect the amber suggestions, then click **Replace fields with suggestions**.
+
+Setups remember a relative image or video path so they can restore the source. Media is referenced, not embedded: copy it along with the setup when moving computers. Loading a setup never starts outputs automatically. A paused video, or a video that reaches the end with Loop disabled, holds its last frame until you resume or restart.
 
 The TMS PDF user guide covers the internal workflow. Source test fixtures in `samples` are developer checks and are not included in the application package.
 
@@ -50,7 +52,7 @@ For NDI input and output, an NDI runtime must be installed. The app checks the s
 
 1. Make the scoreboard camera feed available as an NDI output in vMix. The camera feed must already have reached the studio; this app does not transport the remote game's feed to the studio.
 2. Choose that NDI source in the left sidebar and click **Connect**. Discovery refreshes periodically; **Refresh** scans immediately.
-3. If the camera is angled, use **Straighten camera** first. Draw fields manually, or click **Find fields**. Amber boxes are suggestions only. **Replace fields with suggestions** replaces the field list; **Undo detection** restores the previous list. Name each field yourself.
+3. Review the initial automatic boxes. If the camera is angled, use **Straighten camera**, then adjust the boxes. Add missing fields with **+ Draw a field**. For an explicit rescan, click **Find fields**; amber boxes are suggestions only. **Replace fields with suggestions** replaces the field list; **Undo detection** restores the previous list. Name each field yourself.
 4. Move a field by dragging inside its box; resize from its lower-right square. Exact crop positions are also editable as percentages. Leave room for every possible digit, including scores that gain a digit.
 5. Select a field and use **Cleanup** to compare its original crop with the transparent result. Adjust cutoff, softness, brightness, color, thickness, smoothing, and speckle removal. Settings are independent per field.
 6. Save your setup. Layouts include perspective, field names, normalized crops, cleanup settings, output enablement, and the source name or image/video path. They do not embed media or GTZIP artwork. Loading a saved NDI layout requires connecting the source again, and never starts outputs automatically.
@@ -62,7 +64,7 @@ If no new NDI frame arrives for 1.5 seconds, the app displays **NO SIGNAL**, dim
 ## Current limits
 
 - Early prototype, verified with the supplied real photo, synthetic geometry/video, and local NDI loopback. It still needs testing against a live game camera and the intended vMix scorebug.
-- Detection groups bright pixels and warm display panels only when requested. It does not recognize field meanings. Reflections and labels can produce extra/merged suggestions. Stabilization separately tracks a fixed camera reference; crops remain fixed until edited.
+- Detection groups bright pixels and warm display panels once on initial setup, or when explicitly requested afterward. It does not recognize field meanings. Reflections and labels can produce extra/merged boxes. Stabilization separately tracks a fixed camera reference; crops remain fixed until edited.
 - Background removal uses either the brightest RGB channel or the dimmest channel for white-highlight isolation. Complex lighting may require manual adjustments. It cannot restore missing LED segments, lost detail, occlusions, or severe blur.
 - Up to 24 fields; independent NDI streams at a target of 30 fps. No audio. Throughput depends on crop size, processing controls, network, and available CPU. Source frames may be skipped to keep latency bounded.
 - Output widths are padded to an even number of pixels for NDI compatibility. Alpha is straight, not premultiplied.

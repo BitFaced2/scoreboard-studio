@@ -34,6 +34,7 @@ public partial class MainWindow
         // Decode images before changing the existing setup, so an invalid image
         // does not discard the operator's current source or geometry.
         VideoFrame? image = mediaPath is not null && !missing && layout.VideoPath is null ? LoadImage(mediaPath) : null;
+        CancelDetection(); // Even an intentionally empty saved layout belongs to the operator.
         EndPerspectiveEditing();
         ResetStabilization();
         output = false; OutputButton.Content = "Start NDI outputs"; generation++;

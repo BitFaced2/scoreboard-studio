@@ -34,15 +34,10 @@ public partial class MainWindow
             Require(initial.Width<=1280 && initial.Height<=720,"Video exceeded the processing size limit.");
             await Task.Delay(1000);
             Require(engine.Preview.RawSource!.Pixels.Where((_,i)=>i%4!=3).Average(b=>(double)b)>5,"Decoded video was black.");
-            Require(fields.Count==0,"Video loading placed fields without operator approval.");
-            DetectClick(this,new());
-            await Until(()=>AcceptDetection.Visibility==Visibility.Visible,"Find fields did not produce suggestions.");
-            Require(fields.Count==0,"Detection replaced fields before acceptance.");
-            AcceptDetectionClick(this,new());
-            await Until(()=>fields.Count>0 && engine.Preview.Fields.Count==fields.Count,"Accepted fields were not processed.");
+            await Until(()=>fields.Count>0 && engine.Preview.Fields.Count==fields.Count,"Initial automatic fields were not created.");
             if(Arg("--expect-auto-fields") is {} expected)Require(fields.Count==int.Parse(expected),$"Expected {expected} automatic fields, got {fields.Count}.");
             RefreshPreview();UpdateLayout();CaptureWindow(System.IO.Path.Combine(directory,"automatic-fields.png"));
-            report.Add($"PASS: video load preserved an empty layout; operator accepted {fields.Count} suggested fields.");
+            report.Add($"PASS: first video load created {fields.Count} initial fields automatically.");
             if(Arg("--test-layout") is {} layoutPath) OpenLayout(layoutPath);
             var savedRegions=fields.Select(f=>f.Region).ToArray();await Task.Delay(900);
             Require(fields.Select(f=>f.Region).SequenceEqual(savedRegions),"Automatic detection overwrote a loaded layout.");
@@ -94,6 +89,7 @@ public partial class MainWindow
             video.Loop=true;video.Restart();video.Seek(video.Duration-TimeSpan.FromMilliseconds(650));
             await Until(()=>video.LoopsCompleted>0 && video.Position.TotalSeconds<3,"Playback did not loop.");
             report.Add("PASS: end-of-file and automatic loop.");
+            Require(fields.Select(f=>f.Region).SequenceEqual(savedRegions),"Playback, restart or loop changed field placement.");
 
             savePath=System.IO.Path.Combine(directory,"video-roundtrip.scoreboard.json");
             Require(SaveSetup(),"Video layout did not save.");
