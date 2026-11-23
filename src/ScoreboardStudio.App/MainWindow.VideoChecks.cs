@@ -51,13 +51,20 @@ public partial class MainWindow
             var measured=motionTracker.Transform;
             Require(Math.Abs(measured.X-12)<3&&Math.Abs(measured.Y+8)<3,"Recorded camera shake was not corrected accurately.");
             report.Add("PASS: simulated camera shake on the real recording recovered within three source pixels.");
+            foreach(int shift in new[]{100,150,0})
+            {
+                var moved=CameraStabilizer.Warp(cameraFrame,1,0,-shift,0);
+                var result=motionTracker.Process(moved,stabilization.Area);
+                Require(result.Healthy && Math.Abs(motionTracker.Transform.X-shift)<3,$"Recorded camera did not recover a {shift}px shift: {result.Status}");
+            }
+            report.Add("PASS: larger recorded-image shifts and return to the original view recovered without replacing the reference.");
             int seconds=int.TryParse(Arg("--soak-seconds"),out var requested)?Math.Clamp(requested,3,600):3;
             var process=Process.GetCurrentProcess();process.Refresh();long memoryStart=process.PrivateMemorySize64;
             int healthyFrames=0,samples=0;double processingTotal=0;
             for(int sample=0;sample<seconds*5;sample++)
             {
                 await Task.Delay(200);samples++;
-                if(engine.Preview.Healthy)healthyFrames++;
+                if(engine.Preview.Healthy && engine.Preview.TrackingHealthy)healthyFrames++;
                 processingTotal+=engine.Preview.ProcessingMs;
                 Require(fields.Select(f=>f.Region).SequenceEqual(savedRegions),"Playback or stabilization moved operator fields.");
             }

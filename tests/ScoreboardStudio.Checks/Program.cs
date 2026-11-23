@@ -194,12 +194,13 @@ Check("Video engine applies perspective before field cropping and keeps raw prev
 });
 
 Check("Stabilization corrects camera motion, rejects lost tracking, and reacquires the original reference", StabilizationChecks.MotionAndRecovery);
-Check("Stabilization retains field geometry, clears lost output, and reuses unchanged frames", StabilizationChecks.EngineKeepsFields);
+Check("Stabilization keeps live pixels on tracking loss, preserves crops, and clears only actual source loss", ()=>StabilizationChecks.EngineKeepsFields());
 int updaterIndex=Array.IndexOf(args,"--update-exe");
 UpdateChecks.Register(Check,updaterIndex>=0&&updaterIndex+1<args.Length?args[updaterIndex+1]:null);
 
 if(args.Contains("--ndi"))
 {
+    Check("NDI stays connected and carries changing pixels through tracking loss and recovery", ()=>StabilizationChecks.EngineKeepsFields(true));
     Check("NDI discovery, video receive, alpha output, signal loss, and recovery", () =>
     {
         Require(NdiRuntime.Initialize(),NdiRuntime.Status);

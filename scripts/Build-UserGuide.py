@@ -219,7 +219,7 @@ for title,body in [
     ('NO SIGNAL','Check camera playback and the sending NDI output. Select the right source and reconnect if needed. Cleared fields are intentional when frames stop arriving.'),
     ('Glow or panel remains','Check Remove background. Increase Background cutoff. Try White highlights for bright white cores in colored glow, or Bright colors for saturated LEDs.'),
     ('Digits or decimal vanish','Lower the cutoff, reduce excessive softness, and check Remove isolated speckles. Enlarge the crop if a digit is clipped. Inspect the original: cleanup cannot restore missing pixels.'),
-    ('Boxes drift off the digits','The camera moved or its zoom/framing changed. Stop outputs, unlock, realign the corner correction and review every crop. Crops do not track motion.'),
+    ('CHECK ALIGNMENT','Tracking is lost. Video continues with the last correction; crops may be misaligned. Stop outputs and realign if recovery fails. See page 10.'),
     ('A field is missing in vMix','Check Include in NDI outputs and Start NDI outputs. Look for the computer name and any STILL prefix. Check layer visibility and order in the vMix composition.'),
     ('Media file missing or unsupported','Use Load image or video to locate your media, then save the setup. If video will not open, try an H.264 MP4 supported by Windows. Source files are not embedded in saved layouts.')]:
     y=row(title,body,y,138)
@@ -230,13 +230,13 @@ para(f'Prepared for Total Media Sports · November 2026<br/>Screenshots show the
 
 y=begin(10,'Stabilization & reliability','Correct small camera disturbances while keeping your field boxes fixed.')
 y=step(1,'Set up, then stabilize','Frame the board, straighten it if needed and place your fields. Click <b>Stabilize camera</b>. The app captures a reference from the current view and corrects small shifts, rotation and zoom before cropping. Review alignment, then start outputs.',y)
-y=step(2,'Watch the tracking status','Tracking needs visible detail around the board. If it is lost, outputs become transparent. Returning the camera to the reference view allows recovery. Stabilization never redetects or moves your field boxes.',y)
+y=step(2,'Watch the tracking status','If tracking is lost, <b>CHECK ALIGNMENT</b> appears. Current video continues with the last trusted correction; NDI stays connected and the clock is not frozen. Crops may be wrong until recovery. Review the scorebug and stop outputs if needed. Actual source loss still clears outputs.',y)
 y=step(3,'Realign after a larger move','Stop stabilization, realign the perspective and fields, then enable stabilization again. <b>Set reference</b> explicitly captures a new view and stops outputs for review. References last only for this session; loading a setup or changing sources turns stabilization off.',y)
 y=heading('Resize or minimize the window',y)
 y=para('Use the Windows title-bar controls or the minimize and restore buttons in the app header. Drag a window edge to resize. Startup fits the available screen area; small windows scroll so controls remain reachable.',48,y)-18
 y=heading('If the app closes unexpectedly',y)
 y=para('Error logs are stored in <b>%LOCALAPPDATA%\\TMS Scoreboard Studio\\Diagnostics</b>. Paste that path into File Explorer. On a handled UI error, the app attempts to save a timestamped recovered setup there before closing. Native decoder or process termination failures may not allow recovery.',48,y)-16
-note('Playback checks and limits','Playback reuses rendering resources and skips unchanged-frame processing. Small-disturbance tracking has bounded search; it cannot follow a camera around the venue or restore missing detail. Save the setup regularly and test your actual camera and vMix composition.',y)
+note('Recovery and limits','The tracker uses the last known position and a wider recovery search without moving boxes or replacing the reference. It needs visible detail: blur, occlusion and large moves can still prevent alignment. A weak initial reference passes video through without correction. Save and test your actual camera setup.',y)
 
 y=begin(11,'Updating the app','Check for a new release when you are ready to stop and restart the app.')
 y=picture(SHOT/'update-window.png',48,y,516,175)-12

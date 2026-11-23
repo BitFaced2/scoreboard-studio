@@ -3,7 +3,7 @@ using System.Diagnostics;
 namespace ScoreboardStudio.Core;
 
 public sealed record EnginePlan(string Kind, NdiSource? Source, VideoFrame? Still, ScoreField[] Fields, bool Output, int Generation, PerspectiveSettings? Perspective = null, IPlaybackSource? Playback = null, StabilizationSettings? Stabilization = null);
-public sealed record EnginePreview(VideoFrame? Source, IReadOnlyDictionary<Guid, VideoFrame> Fields, string Status, bool Healthy, int OutputCount, double ProcessingMs, VideoFrame? RawSource = null, int Generation = -1, string StabilizationStatus = "Stabilization off");
+public sealed record EnginePreview(VideoFrame? Source, IReadOnlyDictionary<Guid, VideoFrame> Fields, string Status, bool Healthy, int OutputCount, double ProcessingMs, VideoFrame? RawSource = null, int Generation = -1, string StabilizationStatus = "Stabilization off", bool TrackingHealthy = true);
 
 // All receivers and senders belong to this worker; the UI only exchanges immutable snapshots.
 public sealed class VideoEngine : IDisposable
@@ -68,6 +68,7 @@ public sealed class VideoEngine : IDisposable
                             break;
                     }
                     string tracking="Stabilization off";
+                    bool trackingHealthy=true;
                     var input=latest;
                     if(current.Stabilization is {Enabled:true} settings && latest is not null)
                     {
@@ -76,9 +77,9 @@ public sealed class VideoEngine : IDisposable
                         {
                             var result=stabilizer.Process(latest,settings.Area);
                             tracking=result.Status;
-                            healthy=result.Healthy;
+                            trackingHealthy=result.Healthy;
                             if(result.Frame is not null)aligned=result.Frame;
-                            if(!healthy)status="TRACKING LOST • Outputs transparent";
+                            if(!trackingHealthy)status+=" • CHECK ALIGNMENT — stabilization uncertain; video continues";
                         }
                         else tracking="Stabilization waiting for source";
                         input=aligned ?? latest;
@@ -118,7 +119,7 @@ public sealed class VideoEngine : IDisposable
                         if (!senders.ContainsKey(field.Id)) senders[field.Id] = new NdiSender(OutputName(current.Kind, field.Name));
                         senders[field.Id].Send(fields[field.Id]);
                     }
-                    Volatile.Write(ref preview, new(working, fields, status, healthy, senders.Count, clock.Elapsed.TotalMilliseconds - start, input, generation, tracking));
+                    Volatile.Write(ref preview, new(working, fields, status, healthy, senders.Count, clock.Elapsed.TotalMilliseconds - start, input, generation, tracking, trackingHealthy));
                 }
                 catch (Exception ex)
                 {

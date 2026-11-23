@@ -128,8 +128,8 @@ public partial class MainWindow : Window
         EmptyFieldsText.Text=preview.Healthy ? "Use + Draw a field to add a box, or Find fields to rescan. Your boxes stay where you put them." : "Load an image or video, or connect NDI. A fresh setup finds its initial fields once.";
         StabilizationStatus.Text = preview.StabilizationStatus;
         SignalText.Text = preview.Status;
-        SignalBanner.Background = Brush(kind == "None" ? "#17304A" : preview.Healthy ? kind == "NDI" ? "#173D32" : "#40331E" : "#4C2429");
-        SignalText.Foreground = Brush(kind == "None" ? "#A8D6FF" : preview.Healthy ? kind == "NDI" ? "#8EF2D0" : "#F2CA83" : "#FFB1B9");
+        SignalBanner.Background = Brush(kind == "None" ? "#17304A" : preview.Healthy ? kind == "NDI" && preview.TrackingHealthy ? "#173D32" : "#40331E" : "#4C2429");
+        SignalText.Foreground = Brush(kind == "None" ? "#A8D6FF" : preview.Healthy ? kind == "NDI" && preview.TrackingHealthy ? "#8EF2D0" : "#F2CA83" : "#FFB1B9");
         var displayFrame = EditingPerspective ? perspectiveFrame : preview.Source;
         EmptySourcePanel.Visibility = displayFrame is null ? Visibility.Visible : Visibility.Collapsed;
         if (displayFrame is { } frame)
@@ -148,9 +148,9 @@ public partial class MainWindow : Window
             {
                 card.Image = preview.Fields.TryGetValue(card.Id, out var fieldFrame) ? UpdateBitmap(card.Image,fieldFrame) : null;
                 var field = fields.First(f => f.Id == card.Id);
-                card.Status = !field.Enabled ? "DISABLED" : !output ? "STOPPED" : !preview.Healthy ? "NO SIGNAL" : preview.OutputCount > 0 ? "SENDING" : "STARTING";
+                card.Status = !field.Enabled ? "DISABLED" : !output ? "STOPPED" : !preview.Healthy ? "NO SIGNAL" : preview.OutputCount > 0 ? preview.TrackingHealthy ? "SENDING" : "SENDING / CHECK ALIGNMENT" : "STARTING";
             }
-        OutputStatus.Text = preview.OutputCount > 0 ? $"{preview.OutputCount} NDI OUTPUTS   •   {(preview.Healthy ? "SENDING" : "TRANSPARENT / NO SIGNAL")}" : output ? "OUTPUTS STARTING / CHECK STATUS" : "OUTPUTS STOPPED";
+        OutputStatus.Text = preview.OutputCount > 0 ? $"{preview.OutputCount} NDI OUTPUTS   •   {(preview.Healthy ? preview.TrackingHealthy ? "SENDING" : "SENDING / CHECK ALIGNMENT" : "TRANSPARENT / NO SIGNAL")}" : output ? "OUTPUTS STARTING / CHECK STATUS" : "OUTPUTS STOPPED";
         if (++ticks % 30 == 0 && !SourceCombo.IsDropDownOpen) RefreshSources();
     }
     private static BitmapSource Bitmap(VideoFrame frame)
@@ -630,6 +630,14 @@ public partial class MainWindow : Window
             if(perspective.Enabled) throw new Exception("Perspective reset failed.");
             string? recovery=SaveRecovery();
             if(recovery is null || Layout.Load(recovery).Fields.Count!=fields.Count)throw new Exception("Recovery setup could not be restored.");
+            var flatPixels=new byte[640*360*4];
+            for(int i=0;i<flatPixels.Length;i+=4) {flatPixels[i]=flatPixels[i+1]=flatPixels[i+2]=100;flatPixels[i+3]=255;}
+            engine.Configure(new("Image",null,new(640,360,flatPixels),fields.Select(f=>f.Snapshot()).ToArray(),false,generation+100,Stabilization:new(true,1)));
+            for(int i=0;i<100 && !engine.Preview.Status.Contains("CHECK ALIGNMENT");i++)await Task.Delay(50);
+            WorkspaceTabs.SelectedIndex=0;RefreshPreview();UpdateLayout();
+            if(!engine.Preview.Healthy || engine.Preview.TrackingHealthy || SourceImage.Opacity!=1 || !SignalText.Text.Contains("CHECK ALIGNMENT"))throw new Exception("Tracking warning hid the live preview or reported a source outage.");
+            CaptureWindow(System.IO.Path.Combine(directory,"tracking-warning.png"));
+            PushPlan();await Task.Delay(200);
             if(testArgs.Contains("--update-ui-check"))
             {
                 locked=true;CheckUpdatesClick(this,new());

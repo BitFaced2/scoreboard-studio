@@ -1,4 +1,4 @@
-TMS SCOREBOARD STUDIO 0.5.0 - INTERNAL USE
+TMS SCOREBOARD STUDIO 0.5.1 - INTERNAL USE
 
 START
 
@@ -60,7 +60,11 @@ CAMERA STABILIZATION
 After setup, click Stabilize camera to capture a reference. Review the crops,
 then start outputs. Small shifts, rotation and zoom are corrected beneath your
 fixed boxes. Tracking needs visible detail around the board. Tracking loss
-clears outputs until the reference is found again. For a large camera move,
+shows CHECK ALIGNMENT while current video continues with the last correction.
+The NDI output stays connected; an old clock image is never frozen. Crops may
+be misaligned until recovery, so review the scorebug. Actual source loss still
+clears outputs. The tracker also searches more widely to recover larger shifts.
+For a deliberate camera move,
 stop stabilization, realign the board and fields, then enable it again.
 Set reference explicitly captures a new view and stops outputs for review.
 Changing sources or loading a setup disables stabilization; references are

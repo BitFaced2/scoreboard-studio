@@ -17,6 +17,7 @@ public sealed class CameraStabilizer
     private int width, height, sourceWidth, sourceHeight;
     private VideoFrame? lastSource;
     private StabilizationResult? lastResult;
+    private long lastRecoverySearch;
     private const int Radius = 5;
     public (double A,double B,double X,double Y) Transform {get;private set;}=(1,0,0,0);
 
@@ -32,20 +33,48 @@ public sealed class CameraStabilizer
             lastSource=source;
             return lastResult = patches.Count >= 8
                 ? new(source,true,"Stabilization ready • Reference set")
-                : new(null,false,"Stabilization needs more detail • Reframe the board, then Set reference");
+                : new(source,false,"Stabilization needs more detail • Video continues; reframe, then Set reference");
         }
         lastSource=source;
         if (source.Width!=sourceWidth || source.Height!=sourceHeight)
-            return lastResult=new(null,false,"Source size changed • Review alignment and Set reference");
-        if (patches.Count<8) return lastResult!;
+            return lastResult=new(source,false,"Source size changed • Video continues; review alignment and Set reference");
+        if (patches.Count<8) return lastResult=new(source,false,"Stabilization needs more detail • Video continues; reframe, then Set reference");
         var gray=Gray(source);
+        bool found=TryTrack(gray,Math.Max(8,width/10),true,out var fitted,out int count);
+        // A wider search is needed only after losing the normal motion window.
+        // Limit retries while obscured so an untrackable frame cannot monopolize playback.
+        long now=System.Diagnostics.Stopwatch.GetTimestamp();
+        if(!found && (lastResult!.Healthy || lastRecoverySearch==0 || (now-lastRecoverySearch)/(double)System.Diagnostics.Stopwatch.Frequency>=.25))
+        {
+            lastRecoverySearch=now;
+            found=TryTrack(gray,Math.Max(16,width/5),false,out fitted,out count);
+        }
+        if(!found)
+        {
+            var t=Transform;
+            // Keep current pixels moving beneath the last trusted geometry. Never
+            // retain an old scoreboard image or silently replace the reference.
+            var live=t==(1d,0d,0d,0d)?source:Warp(source,t.A,t.B,t.X,t.Y);
+            return lastResult=new(live,false,"Tracking lost • Video continues with last correction; check alignment");
+        }
+        double scale=sourceWidth/(double)width;
+        Transform=(fitted.A,fitted.B,fitted.X*scale,fitted.Y*scale);
+        var pixels=Warp(source,fitted.A,fitted.B,fitted.X*scale,fitted.Y*scale);
+        return lastResult=new(pixels,true,$"Stabilizing • {count}/{patches.Count} reference points");
+    }
+    private bool TryTrack(byte[] gray,int search,bool predicted,out Motion fitted,out int count)
+    {
+        fitted=default;count=0;
         var matches=new List<Match>();
-        int search=Math.Max(8,width/10);
+        double scale=width/(double)sourceWidth;
+        var previous=new Motion(Transform.A,Transform.B,Transform.X*scale,Transform.Y*scale);
         foreach (var patch in patches)
         {
             double best=double.MaxValue; int bx=0,by=0;
-            for(int y=Math.Max(Radius,patch.Y-search); y<=Math.Min(height-Radius-1,patch.Y+search); y+=2)
-                for(int x=Math.Max(Radius,patch.X-search); x<=Math.Min(width-Radius-1,patch.X+search); x+=2)
+            var center=predicted?previous.Map(patch.X,patch.Y):(patch.X,patch.Y);
+            int centerX=(int)Math.Round(center.Item1),centerY=(int)Math.Round(center.Item2);
+            for(int y=Math.Max(Radius,centerY-search); y<=Math.Min(height-Radius-1,centerY+search); y+=2)
+                for(int x=Math.Max(Radius,centerX-search); x<=Math.Min(width-Radius-1,centerX+search); x+=2)
                 {
                     double error=Error(gray,patch,x,y);
                     if(error<best) { best=error; bx=x; by=y; }
@@ -82,19 +111,16 @@ public sealed class CameraStabilizer
             if(agreed.Count>inliers.Count)inliers=agreed;
         }
         if(inliers.Count<Math.Max(8,(int)Math.Ceiling(patches.Count*.5)))
-            return lastResult=new(null,false,"Tracking lost • Outputs transparent; return camera or Set reference after realigning");
+            return false;
         double mx=inliers.Average(p=>p.X),my=inliers.Average(p=>p.Y),mu=inliers.Average(p=>p.U),mv=inliers.Average(p=>p.V);
         double divisor=0,aa=0,bb=0;
         foreach(var p in inliers) { double x=p.X-mx,y=p.Y-my,u=p.U-mu,v=p.V-mv;divisor+=x*x+y*y;aa+=x*u+y*v;bb+=x*v-y*u; }
-        var fitted=new Motion(aa/divisor,bb/divisor,mu-aa/divisor*mx+bb/divisor*my,mv-bb/divisor*mx-aa/divisor*my);
-        if(!Plausible(fitted))return lastResult=new(null,false,"Tracking lost • Review camera alignment");
-        double scale=sourceWidth/(double)width;
-        Transform=(fitted.A,fitted.B,fitted.X*scale,fitted.Y*scale);
-        var pixels=Warp(source,fitted.A,fitted.B,fitted.X*scale,fitted.Y*scale);
-        return lastResult=new(pixels,true,$"Stabilizing • {inliers.Count}/{patches.Count} reference points");
+        fitted=new Motion(aa/divisor,bb/divisor,mu-aa/divisor*mx+bb/divisor*my,mv-bb/divisor*mx-aa/divisor*my);
+        count=inliers.Count;
+        return Plausible(fitted);
     }
     private bool Plausible(Motion m) => double.IsFinite(m.A) && Math.Abs(m.A*m.A+m.B*m.B-1)<.12
-        && Math.Abs(Math.Atan2(m.B,m.A))<Math.PI/36 && Math.Abs(m.X)<width*.15 && Math.Abs(m.Y)<width*.15;
+        && Math.Abs(Math.Atan2(m.B,m.A))<Math.PI/36 && Math.Abs(m.X)<width*.35 && Math.Abs(m.Y)<width*.35;
     private static double Residual(Motion m,Match p) {var q=m.Map(p.X,p.Y);return Math.Sqrt(Math.Pow(q.X-p.U,2)+Math.Pow(q.Y-p.V,2));}
     private byte[] Gray(VideoFrame f)
     {

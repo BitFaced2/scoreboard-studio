@@ -46,28 +46,71 @@ internal static class StabilizationChecks
         Require(tracker.Process(reference with {Pixels=(byte[])reference.Pixels.Clone()},null).Healthy,"Reference did not recover after loss.");
         Require(!new CameraStabilizer().Process(blank,null).Healthy,"Blank reference should require a new reference.");
         Require(!tracker.Process(new(320,180,new byte[320*180*4]),null).Healthy,"Changed resolution should require realignment.");
+        var large=new CameraStabilizer();large.Process(reference,null);
+        foreach(double shift in new[]{100.0,130.0,160.0,0.0})
+        {
+            var moved=CameraStabilizer.Warp(reference,1,0,-shift,0);
+            var timer=System.Diagnostics.Stopwatch.StartNew();
+            var result=large.Process(moved,null);
+            Console.WriteLine($"  Larger shift {shift:0}px: {timer.ElapsedMilliseconds} ms, {result.Status}");
+            Require(result.Healthy && Math.Abs(large.Transform.X-shift)<1.5,"Larger shift or return to reference did not recover accurately.");
+        }
     }
-    internal static void EngineKeepsFields()
+    internal static void EngineKeepsFields(bool ndi=false)
     {
         var source=new TestPlayback {Snapshot=new(Board(),"Playing",true)};
-        var field=new ScoreField {Region=new(.2,.2,.3,.3),Cleanup=new(){RemoveBackground=false}};
+        var field=new ScoreField {Name="Tracking check "+Guid.NewGuid().ToString("N"),Region=new(.2,.2,.3,.3),Cleanup=new(){RemoveBackground=false,Color="Original"}};
         var region=field.Region;
         using var engine=new VideoEngine();
         var settings=new StabilizationSettings(true,1);
-        engine.Configure(new("Video",null,null,[field],false,1,Playback:source,Stabilization:settings));
-        Wait(()=>engine.Preview.Healthy&&engine.Preview.Fields.Count==1);
+        engine.Configure(new("Video",null,null,[field],ndi,1,Playback:source,Stabilization:settings));
+        Wait(()=>engine.Preview.Healthy&&engine.Preview.TrackingHealthy&&engine.Preview.Fields.Count==1);
+        using var discovery=ndi?new NdiDiscovery():null;
+        NdiSource? outputSource=null;
+        if(ndi)Wait(()=> (outputSource=discovery!.GetSources().FirstOrDefault(s=>s.Name.Contains(field.Name))) is not null);
+        using var receiver=ndi?new NdiReceiver(outputSource!):null;
+        void Receive(byte value,bool visible=true)
+        {
+            if(receiver is null)return;
+            Wait(()=> {var f=receiver.Capture(50);if(f is null)return false;int p=(f.Height/2*f.Width+f.Width/2)*4;return visible?f.Pixels[p+3]>240 && Math.Abs(f.Pixels[p]-value)<6:f.Pixels.Where((_,i)=>i%4==3).All(v=>v<10);});
+            Require(engine.Preview.OutputCount==1,"Tracking loss stopped the NDI sender.");
+        }
         var first=engine.Preview.Fields[field.Id];
         Thread.Sleep(120);
         Require(ReferenceEquals(first,engine.Preview.Fields[field.Id]),"Unchanged video frames were reprocessed.");
         source.Snapshot=new(CameraStabilizer.Warp(Board(),1,0,-10,6),"Playing",true);
         Wait(()=>engine.Preview.Healthy&&!ReferenceEquals(first,engine.Preview.Fields[field.Id]));
         Require(field.Region==region,"Tracking changed the field crop.");
-        source.Snapshot=new(new(640,360,new byte[640*360*4]),"Playing",true);
+        foreach(byte value in new byte[]{40,180})
+        {
+            source.Snapshot=new(Flat(value),"Playing",true);
+            Wait(()=>engine.Preview.Healthy&&!engine.Preview.TrackingHealthy && engine.Preview.Fields[field.Id].Pixels[0]==value);
+            Require(engine.Preview.Fields[field.Id].Pixels[3]==255,"Tracking loss blanked the live field.");
+            Require(engine.Preview.Status.Contains("CHECK ALIGNMENT"),"Tracking loss was not identified separately from source failure.");
+            Receive(value);
+        }
+        source.Snapshot=new(Flat(180),"NO SIGNAL",false);
         Wait(()=>!engine.Preview.Healthy);
-        Require(engine.Preview.Fields[field.Id].Pixels.All(p=>p==0),"Tracking loss retained visible output.");
+        Require(engine.Preview.Fields[field.Id].Pixels.All(p=>p==0),"Actual source loss retained visible output.");
+        Receive(0,false);
         source.Snapshot=new(Board(),"Playing",true);
-        Wait(()=>engine.Preview.Healthy);
+        Wait(()=>engine.Preview.Healthy&&engine.Preview.TrackingHealthy);
         Require(field.Region==region,"Recovery changed the field crop.");
+        // A reference without features must also pass new pixels through each frame.
+        source.Snapshot=new(Flat(50),"Playing",true);
+        engine.Configure(new("Video",null,null,[field],ndi,1,Playback:source,Stabilization:new(true,2)));
+        Wait(()=>engine.Preview.StabilizationStatus.Contains("needs more detail"));
+        source.Snapshot=new(Flat(190),"Playing",true);
+        Wait(()=>engine.Preview.Healthy&&!engine.Preview.TrackingHealthy&&engine.Preview.Fields[field.Id].Pixels[0]==190);
+        Receive(190);
+        engine.Configure(new("Video",null,null,[field],ndi,1,Playback:source,Stabilization:new(false)));
+        Wait(()=>engine.Preview.StabilizationStatus=="Stabilization off"&&engine.Preview.Healthy&&engine.Preview.TrackingHealthy);
+    }
+    private static VideoFrame Flat(byte value)
+    {
+        var pixels=new byte[640*360*4];
+        for(int i=0;i<pixels.Length;i+=4) {pixels[i]=pixels[i+1]=pixels[i+2]=value;pixels[i+3]=255;}
+        return new(640,360,pixels);
     }
     private sealed class TestPlayback:IPlaybackSource
     {
@@ -75,10 +118,10 @@ internal static class StabilizationChecks
         public PlaybackSnapshot Snapshot {get=>Volatile.Read(ref snapshot);set=>Volatile.Write(ref snapshot,value);}
     }
     private static void Require(bool condition,string message) {if(!condition)throw new Exception(message);}
-    private static void Wait(Func<bool> ready)
+    private static void Wait(Func<bool> ready,[System.Runtime.CompilerServices.CallerArgumentExpression(nameof(ready))] string condition="")
     {
         var timer=System.Diagnostics.Stopwatch.StartNew();
         while(timer.Elapsed.TotalSeconds<8) {if(ready())return;Thread.Sleep(30);}
-        throw new Exception("Timed out waiting for stabilization pipeline.");
+        throw new Exception("Timed out waiting for stabilization pipeline: "+condition);
     }
 }

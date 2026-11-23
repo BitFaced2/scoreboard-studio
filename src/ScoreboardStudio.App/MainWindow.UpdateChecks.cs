@@ -36,7 +36,9 @@ public partial class MainWindow
                 var session=new UpdateSession {Version=AppUpdate.CurrentVersion.ToString(),TargetDirectory=target,RestoreSetup=setup,TestExitAfterRestart=true};
                 string folder=AppUpdate.Folder(session);Directory.CreateDirectory(folder);File.Copy(package,Path.Combine(folder,"package.zip"));
                 using(var input=File.OpenRead(package))session.Sha256=Convert.ToHexString(SHA256.HashData(input));
-                string helper=Path.Combine(folder,"ScoreboardStudio.Update.exe");File.Copy(Environment.ProcessPath!,helper);
+                // Exercise the updater shipped in the installed release, not
+                // the implementation from the incoming package.
+                string helper=Path.Combine(folder,"ScoreboardStudio.Update.exe");File.Copy(Path.Combine(target,"ScoreboardStudio.exe"),helper);
                 var waitStart=new ProcessStartInfo(Environment.ProcessPath!) {UseShellExecute=false,CreateNoWindow=true,WindowStyle=ProcessWindowStyle.Hidden};waitStart.ArgumentList.Add("--update-test-wait");
                 using var parent=Process.Start(waitStart)!;
                 session.ParentPid=parent.Id;session.ParentStarted=parent.StartTime.ToUniversalTime().Ticks;
