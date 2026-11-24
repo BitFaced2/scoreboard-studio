@@ -2,8 +2,8 @@ using System.Diagnostics;
 
 namespace ScoreboardStudio.Core;
 
-public sealed record EnginePlan(string Kind, NdiSource? Source, VideoFrame? Still, ScoreField[] Fields, bool Output, int Generation, PerspectiveSettings? Perspective = null, IPlaybackSource? Playback = null, StabilizationSettings? Stabilization = null);
-public sealed record EnginePreview(VideoFrame? Source, IReadOnlyDictionary<Guid, VideoFrame> Fields, string Status, bool Healthy, int OutputCount, double ProcessingMs, VideoFrame? RawSource = null, int Generation = -1, string StabilizationStatus = "Stabilization off", bool TrackingHealthy = true);
+public sealed record EnginePlan(string Kind, NdiSource? Source, VideoFrame? Still, ScoreField[] Fields, bool Output, int Generation, PerspectiveSettings? Perspective = null, IPlaybackSource? Playback = null, StabilizationSettings? Stabilization = null, OutputSettings? OutputSettings = null);
+public sealed record EnginePreview(VideoFrame? Source, IReadOnlyDictionary<Guid, VideoFrame> Fields, string Status, bool Healthy, int OutputCount, double ProcessingMs, VideoFrame? RawSource = null, int Generation = -1, string StabilizationStatus = "Stabilization off", bool TrackingHealthy = true, VideoFrame? Combined = null);
 
 // All receivers and senders belong to this worker; the UI only exchanges immutable snapshots.
 public sealed class VideoEngine : IDisposable
@@ -26,6 +26,8 @@ public sealed class VideoEngine : IDisposable
         CameraStabilizer? stabilizer=null;
         int reference=-1;
         VideoFrame? cachedInput=null, cachedWorking=null, aligned=null;
+        VideoFrame? combined=null;
+        bool combinedEmpty=false;
         EnginePlan? cachedPlan=null;
         bool cachedHealthy=false;
         Dictionary<Guid,VideoFrame> cachedFields=[];
@@ -45,7 +47,7 @@ public sealed class VideoEngine : IDisposable
                         { try { sender.Send(new(2, 2, new byte[16])); } catch { } sender.Dispose(); }
                         senders.Clear();
                         generation = current.Generation; latest = null; lastReceived = -10; retryAt = 0;
-                        stabilizer=null; reference=-1; cachedInput=null; cachedPlan=null; cachedWorking=null; aligned=null; cachedFields=[];
+                        stabilizer=null; reference=-1; cachedInput=null; cachedPlan=null; cachedWorking=null; aligned=null; cachedFields=[];combined=null;
                     }
                     bool healthy = false;
                     string status = "Choose a source";
@@ -102,24 +104,36 @@ public sealed class VideoEngine : IDisposable
                             fields[field.Id] = processed;
                         }
                         cachedInput=input;cachedPlan=current;cachedHealthy=healthy;cachedWorking=working;cachedFields=fields;
+                        if(current.OutputSettings is {Mode:"Combined"} canvas)
+                        {
+                            // An unplaced canvas stays empty regardless of incoming video.
+                            bool noPlacedFields=!current.Fields.Any(f=>f.Enabled&&f.OutputRegion is not null);
+                            if(!(noPlacedFields&&combinedEmpty&&combined is not null&&combined.Width==canvas.Width&&combined.Height==canvas.Height))
+                                combined=FieldComposition.Render(canvas,current.Fields,fields,healthy);
+                            combinedEmpty=noPlacedFields||!healthy;
+                        }
+                        else combined=null;
                     }
-                    var wanted = current.Output && latest is not null
-                        ? current.Fields.Where(f => f.Enabled && fields.ContainsKey(f.Id)).ToArray() : [];
+                    var wanted=new Dictionary<Guid,(string Name,VideoFrame Frame)>();
+                    if(current.Output && latest is not null)
+                    {
+                        if(combined is not null)wanted[Guid.Empty]=(OutputName(current.Kind,"Combined"),combined);
+                        else foreach(var field in current.Fields.Where(f=>f.Enabled&&fields.ContainsKey(f.Id)))wanted[field.Id]=(OutputName(current.Kind,field.Name),fields[field.Id]);
+                    }
                     foreach (var id in senders.Keys.ToArray())
                     {
-                        var field = wanted.FirstOrDefault(f => f.Id == id);
-                        if (field is null || senders[id].Name != OutputName(current.Kind, field.Name))
+                        if (!wanted.TryGetValue(id,out var destination) || senders[id].Name != destination.Name)
                         {
                             // Clear the receiver's cached picture before stopping the sender.
                             senders[id].Send(new(2, 2, new byte[16])); senders[id].Dispose(); senders.Remove(id);
                         }
                     }
-                    foreach (var field in wanted)
+                    foreach (var destination in wanted)
                     {
-                        if (!senders.ContainsKey(field.Id)) senders[field.Id] = new NdiSender(OutputName(current.Kind, field.Name));
-                        senders[field.Id].Send(fields[field.Id]);
+                        if (!senders.ContainsKey(destination.Key)) senders[destination.Key] = new NdiSender(destination.Value.Name);
+                        senders[destination.Key].Send(destination.Value.Frame);
                     }
-                    Volatile.Write(ref preview, new(working, fields, status, healthy, senders.Count, clock.Elapsed.TotalMilliseconds - start, input, generation, tracking, trackingHealthy));
+                    Volatile.Write(ref preview, new(working, fields, status, healthy, senders.Count, clock.Elapsed.TotalMilliseconds - start, input, generation, tracking, trackingHealthy,combined));
                 }
                 catch (Exception ex)
                 {

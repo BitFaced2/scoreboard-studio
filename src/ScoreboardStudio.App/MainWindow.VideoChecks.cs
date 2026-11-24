@@ -35,9 +35,64 @@ public partial class MainWindow
             await Task.Delay(1000);
             Require(engine.Preview.RawSource!.Pixels.Where((_,i)=>i%4!=3).Average(b=>(double)b)>5,"Decoded video was black.");
             await Until(()=>fields.Count>0 && engine.Preview.Fields.Count==fields.Count,"Initial automatic fields were not created.");
+            Require(fields.All(f=>f.OutputRegion is not null),"Detected fields were not automatically placed on the combined output.");
+            var initialOutputPositions=fields.Select(f=>f.OutputRegion).ToArray();await Task.Delay(500);
+            Require(fields.Select(f=>f.OutputRegion).SequenceEqual(initialOutputPositions),"Playback rearranged initial output positions.");
             if(Arg("--expect-auto-fields") is {} expected)Require(fields.Count==int.Parse(expected),$"Expected {expected} automatic fields, got {fields.Count}.");
             RefreshPreview();UpdateLayout();CaptureWindow(System.IO.Path.Combine(directory,"automatic-fields.png"));
-            report.Add($"PASS: first video load created {fields.Count} initial fields automatically.");
+            report.Add($"PASS: first video load created {fields.Count} initial fields and output positions automatically; playback preserved placement.");
+            if(Arg("--test-layout") is {} correctionLayout && Layout.Load(correctionLayout).Perspective is {Enabled:true} rightBoard)
+            {
+                video!.TogglePause();await Task.Delay(300);
+                var originalFields=fields.Select(f=>f.Snapshot()).ToArray();
+                // Exercise the same wide correction as the reported screenshots, plus
+                // a canvas matching the scoreboard proportions.
+                foreach(var size in new[]{(1280,720),(480,500)})
+                {
+                    PerspectiveClick(this,new());perspectiveDraft=rightBoard with {};
+                    PerspectiveWidth.Text=size.Item1.ToString();PerspectiveHeight.Text=size.Item2.ToString();
+                    ApplyPerspectiveClick(this,new());
+                    Require(perspectiveDetectionPending,"Correction did not start its one-time rescan.");
+                    OutputClick(this,new());Require(!output,"Outputs started with stale perspective boxes.");
+                    await perspectiveDetectionTask;
+                    await Task.Delay(300);RefreshPreview();UpdateLayout();CaptureWindow(Path.Combine(directory,$"corrected-{size.Item1}.png"));
+                    Require(fields.Count==2,$"Corrected one-board view should have two fields; found {fields.Count} at {size}: "+string.Join("; ",fields.Select(f=>f.Region.ToString())));
+                    Require(fields[0].Region.Y<.4&&fields[1].Region.Y>.35,"Corrected clock/shot-clock positions are wrong: "+string.Join("; ",fields.Select(f=>f.Region.ToString())));
+                    foreach(var corrected in fields)
+                    {
+                        var retained=originalFields.FirstOrDefault(f=>f.Id==corrected.Id);
+                        Require(retained is not null&&retained.Region.X>.43,"Correction matched a field on the wrong board.");
+                        Require(corrected.OutputRegion==retained!.OutputRegion&&corrected.Cleanup==retained.Cleanup&&corrected.Name==retained.Name,
+                            "Correction discarded a matching field's name, cleanup or output position.");
+                    }
+                    var correctedRegions=fields.Select(f=>f.Region).ToArray();await Task.Delay(300);
+                    Require(fields.Select(f=>f.Region).SequenceEqual(correctedRegions),"Correction kept redetecting fields.");
+                    await Until(()=>engine.Preview.Fields.Count==2,"Corrected fields did not reach the video engine.");
+                    RefreshPreview();UpdateLayout();CaptureWindow(Path.Combine(directory,$"corrected-{size.Item1}.png"));
+                    UndoDetectionClick(this,new());
+                    Require(!perspective.Enabled&&fields.Select(f=>f.Region).SequenceEqual(originalFields.Select(f=>f.Region)),"Undo correction did not restore both view and boxes.");
+                }
+                PerspectiveClick(this,new());perspectiveDraft=rightBoard with {};
+                PerspectiveWidth.Text="1280";PerspectiveHeight.Text="720";ApplyPerspectiveClick(this,new());
+                fields[0].Region=new(.01,.02,.1,.1);Changed();await perspectiveDetectionTask;
+                Require(fields.Count==originalFields.Length&&fields[0].Region==new Crop(.01,.02,.1,.1),"Late correction detection overwrote a subsequent edit.");
+                UndoDetectionClick(this,new());
+                PerspectiveClick(this,new());perspectiveDraft=rightBoard with {};
+                PerspectiveWidth.Text="1280";PerspectiveHeight.Text="720";ApplyPerspectiveClick(this,new());await perspectiveDetectionTask;
+                PerspectiveClick(this,new());ResetPerspectiveClick(this,new());await perspectiveDetectionTask;
+                Require(!perspective.Enabled&&fields.Count==4,"Reset correction did not redetect the full four-field view.");
+                foreach(int second in new[]{8,16,25})
+                {
+                    video.Seek(TimeSpan.FromSeconds(second));
+                    await Until(()=>Math.Abs(video.Position.TotalSeconds-second)<.15,"Paused seek failed.");
+                    var scan=DetectCorrectedFields(video.Snapshot.Frame!,rightBoard);
+                    Require(scan.Regions.Count==2,$"Corrected field count at {second}s was {scan.Regions.Count}.");
+                    Require(scan.Regions[0].Y<.2&&scan.Regions[1].Y>.35,"Rescan did not locate both display rows.");
+                }
+                Require(DetectCorrectedFields(new VideoFrame(1280,720,new byte[1280*720*4]),rightBoard).Regions.Count==0,"Empty view produced phantom fields.");
+                video.TogglePause();
+                report.Add("PASS: correcting two boards to one redetects four fields as two at both canvas sizes and several clock values; matching names/cleanup/output positions retained; undo restores view and boxes; reset redetects four; late results cannot overwrite edits; empty view has no fields.");
+            }
             if(Arg("--test-layout") is {} layoutPath) OpenLayout(layoutPath);
             var savedRegions=fields.Select(f=>f.Region).ToArray();await Task.Delay(900);
             Require(fields.Select(f=>f.Region).SequenceEqual(savedRegions),"Automatic detection overwrote a loaded layout.");
@@ -78,7 +133,10 @@ public partial class MainWindow
             var previous=Hash(engine.Preview.Fields[fields[0].Id]);
             await Until(()=>Hash(engine.Preview.Fields[fields[0].Id])!=previous,"Cleaned video did not update.");
             report.Add("PASS: direct file decoding and moving cleaned fields.");
-            WorkspaceTabs.SelectedIndex=1; await Task.Delay(300);RefreshPreview();UpdateLayout();
+            WorkspaceTabs.SelectedIndex=1;ComparisonSection.IsExpanded=true; await Task.Delay(300);RefreshPreview();UpdateLayout();
+            Require(OriginalPreview.Source is not null&&ReferenceEquals(CleanPreview.Tag,engine.Preview.Fields[Selected!.Id]),"Live comparison did not show the selected cleaned frame.");
+            var comparisonFrame=CleanPreview.Tag;await Task.Delay(250);RefreshPreview();
+            Require(!ReferenceEquals(comparisonFrame,CleanPreview.Tag),"Live comparison stopped updating during playback.");
             CaptureWindow(System.IO.Path.Combine(directory,"video-cleanup.png"));
             WorkspaceTabs.SelectedIndex=0;RefreshPreview();UpdateLayout();
             CaptureWindow(System.IO.Path.Combine(directory,"video-fields.png"));
@@ -112,6 +170,7 @@ public partial class MainWindow
             if(args.Contains("--ndi"))
             {
                 Require(NdiRuntime.Available,"NDI runtime unavailable for requested test.");
+                outputSettings=outputSettings with {Mode="Individual"};SyncComposition();
                 foreach(var field in fields)field.Name="Video check "+Guid.NewGuid().ToString("N")[..8];
                 SyncFields();PushPlan();OutputClick(this,new());
                 await Until(()=>engine.Preview.OutputCount==fields.Count,"File playback did not produce NDI outputs.");

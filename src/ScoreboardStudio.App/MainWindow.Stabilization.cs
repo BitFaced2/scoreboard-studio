@@ -21,6 +21,7 @@ public partial class MainWindow
     }
     private void SetReferenceClick(object sender,RoutedEventArgs e)
     {
+        if(perspectiveDetectionPending) { Notice.Text="Wait for the corrected-view fields to finish updating before setting stabilization.";return; }
         if(locked || EditingPerspective || engine.Preview.RawSource is null)return;
         output=false; OutputButton.Content="Start NDI outputs";
         Crop area=new(0,0,1,1);
@@ -51,7 +52,7 @@ public partial class MainWindow
             Directory.CreateDirectory(Diagnostics.DirectoryPath);
             string path=Path.Combine(Diagnostics.DirectoryPath,"Recovered-"+DateTime.Now.ToString("yyyyMMdd-HHmmss")+".scoreboard.json");
             new Layout { Name=setupName,ImagePath=stillPath,VideoPath=videoPath,SourceName=source?.Name,
-                Perspective=perspective with {},Fields=fields.Select(f=>f.Snapshot()).ToList() }.Save(path);
+                Perspective=perspective with {},Output=SavedOutput(null),Fields=fields.Select(f=>f.Snapshot()).ToList() }.Save(path);
             return path;
         }
         catch(Exception ex) {Diagnostics.Log("Save recovery",ex);return null;}

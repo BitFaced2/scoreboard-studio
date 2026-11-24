@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <Resource Include="Assets\TMS_logo.png" />
+    <Resource Include="Assets\ScoreboardStudio.ico" />
     <ProjectReference Include="..\ScoreboardStudio.Core\ScoreboardStudio.Core.csproj" />
   </ItemGroup>
 
@@ -13,7 +14,8 @@
     <UseWPF>true</UseWPF>
     <PlatformTarget>x64</PlatformTarget>
     <AssemblyName>ScoreboardStudio</AssemblyName>
-    <Version>0.5.1</Version>
+    <ApplicationIcon>Assets\ScoreboardStudio.ico</ApplicationIcon>
+    <Version>0.6.0</Version>
     <Company>Total Media Sports</Company>
     <Product>TMS Scoreboard Studio</Product>
     <Description>Live scoreboard fields for broadcast graphics by Total Media Sports.</Description>

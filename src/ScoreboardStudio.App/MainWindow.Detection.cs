@@ -12,6 +12,12 @@ public partial class MainWindow
 
     private void CancelDetection(bool cancelInitial = true)
     {
+        if (perspectiveDetectionPending)
+        {
+            perspectiveDetectionPending = false;
+            DetectionHint.Text = "Field rescan canceled by another edit. Review the boxes or use Find fields.";
+            Notice.Text = DetectionHint.Text;
+        }
         if(cancelInitial)initialPlacementFinished=true;
         detectionRevision++;
         suggestions.Clear();
@@ -35,7 +41,7 @@ public partial class MainWindow
                 if(!Current())return;
                 if(detection.Regions.Count>0)
                 {
-                    beforeDetection=[];
+                    beforeDetection=[]; beforeDetectionPerspective=null; UndoDetection.Content="Undo detection";
                     DetectionIsolation.SelectedIndex=detection.Isolation=="White highlights"?1:0;
                     DetectionThreshold.Value=detection.Threshold;
                     foreach(var region in detection.Regions)fields.Add(new() {

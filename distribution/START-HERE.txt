@@ -1,4 +1,4 @@
-TMS SCOREBOARD STUDIO 0.5.1 - INTERNAL USE
+TMS SCOREBOARD STUDIO 0.6.0 - INTERNAL USE
 
 START
 
@@ -18,6 +18,14 @@ again as needed. Internet access and a writable app folder are required.
 Versions older than 0.5.0 need one final manual GitHub ZIP download to get this
 feature. No uninstall is needed. Failed downloads do not change the app; ordinary
 installation write failures restore the previous files. Updates are never automatic.
+
+FIND YOUR CONTROLS
+
+Expand NDI source for connection controls. Media file holds file loading and
+playback. Under Fields, Camera setup holds straightening and stabilization;
+Field detection holds detection options. Under Outputs, Scorebug guide and
+canvas holds guide loading and canvas size. Layout actions and Connect to vMix
+contain secondary tools and instructions. These groups start collapsed.
 
 LOAD YOUR FOOTAGE
 
@@ -39,21 +47,51 @@ media with the setup when moving computers. Files are not embedded in layouts.
 
 PREPARE THE FIELDS
 
-For an angled camera, use Fields > Straighten camera, place the four numbered
+For an angled camera, use Fields > Camera setup > Keystone Correction, place the four numbered
 corners, choose the corrected size and click Apply. Leave room for changing digits.
 Name each field and draw a box around any field that was missed.
+Crop and output sliders apply immediately, with values shown beside them.
+Click the larger section headings in the right panel to expand or collapse
+Field settings, Crop position, Output position, Background removal,
+Digit appearance, and Edges and detail. All start collapsed. Your choices stay
+in place when switching fields or tabs during the session.
+Arrow keys fine-tune: crop 0.1 percent, output 1 pixel. No Apply click is needed.
 Find fields provides suggestions you can review and accept explicitly.
 The corner editor freezes the picture. Drag a dot or label directly, or select
 a corner and use arrow keys to fine-tune (Shift = 10 pixels).
 
-Straightening does not delete fields. To remove one, select it under Your
-fields and click Remove selected field at the bottom left. After changing
-the view, resize the remaining boxes or Find fields > Replace fields with suggestions
-to rebuild them. Save setup when finished.
+Applying or resetting correction re-detects field positions and count once.
+Matching fields keep their names, cleanup settings, and output positions.
+Field detection > Undo correction restores the previous view and boxes together.
+Cancel leaves them unchanged. Review the new boxes before starting outputs;
+enable stabilization again if needed. Playback does not repeat detection.
+Remove selected field deletes an unwanted box; + Draw a field adds one.
+Drag any round corner pin to resize a field in Fields or Outputs. The cursor
+changes near a pin; its grab area extends beyond the visible dot.
+Save setup when finished.
 
-Open Cleanup and compare the original and cleaned pixels. Use Bright colors
+The two work tabs are Fields and Outputs. In Outputs, expand Before / After
+to compare the selected field's original and cleaned pixels. It works in both
+output modes and follows field selection. Adjust background removal, digit
+appearance, and edges in the right panel. Use Bright colors
 for red/amber LEDs on dark panels, or White highlights for white digit cores
 surrounded by colored glow. Adjust Background cutoff and Edge softness.
+
+Apply cleanup to all fields and Reset cleanup stay at the bottom of the right
+panel, outside the scrolling sections. Select a field to use them; Live lock
+disables editing.
+
+Preview background above the output canvas offers Checkerboard, Dark, Light,
+and Custom. Choose color opens the color wheel. It changes the combined canvas,
+separate-input cards, and cleaned After preview for this session only.
+The NDI output stays transparent.
+
+DIGIT COLORS
+
+Click Choose digit color for the wheel, sliders and presets, then Use color.
+This applies the shade at 1x brightness in both output modes.
+Digit appearance is the single color control. Older setups use their saved
+digit appearance and ignore separate output-color overrides.
 
 CAMERA STABILIZATION
 
@@ -72,7 +110,8 @@ session-only. Stabilization does not run field detection.
 
 WINDOW AND DIAGNOSTICS
 
-Use the Windows title bar or header buttons to minimize/maximize/restore.
+The app starts maximized. Use the Windows title bar or header buttons to
+minimize/maximize/restore.
 Drag the window edges to resize; smaller windows scroll to reach the controls.
 Error logs and attempted UI-crash setup recovery are stored in:
 %LOCALAPPDATA%\TMS Scoreboard Studio\Diagnostics
@@ -81,10 +120,24 @@ SEND TO VMIX
 
 1. For a live source, choose an NDI feed and click Connect. For a recording,
    use Load image or video directly; vMix playback is not required.
-2. Enable the desired fields and click Start NDI outputs.
-3. In vMix, Add Input > NDI for each Scoreboard - <field name> source.
-4. Position those inputs as layers over your scorebug. They include alpha.
+2. Open Outputs and choose Single Input. Load your GTZIP as a guide.
+   New fields appear automatically in open canvas space. Select each field
+   to move/resize it, or choose a guide target. Existing edits stay fixed.
+   Named fields can use Match field names to guide. Place selected field
+   restores a deliberately unplaced field.
+3. Drag/resize the output boxes or use their live sliders. Source crops stay fixed.
+   Only enabled, placed fields are transmitted. Unplace hides a field from
+   the canvas without deleting its source crop. Guide artwork is preview-only.
+4. Start NDI outputs. In vMix, Add Input > NDI > Scoreboard - Combined.
+   Layer the full canvas over the GT title at matching size and position.
+   Blank its numeric placeholder text to avoid double digits. Your GT title
+   is supplied separately and is not included in the app download.
 5. Save the vMix preset separately. Use Lock for live to protect app settings.
+
+Older setups retain Separate Inputs. Change mode explicitly
+to use one input. New saved setups require version 0.6.0 or newer. Setups
+reference the guide and footage; copy those files when moving computers.
+For coordinated animation, transition the completed composition together.
 
 The source dropdown lists NDI feeds only. Cameras and capture cards must be
 added in vMix and sent over NDI first. An empty dropdown is normal when using
@@ -106,3 +159,8 @@ IF SOMETHING DOES NOT WORK
   lower the cutoff and check the original crop for missing detail.
 
 See the included PDF guide for illustrated operating instructions.
+
+OUTPUT LAYOUT
+New fields default to Stretch to box. Saved sizing choices are preserved.
+Output mode sits beside the output preview checkboxes and wraps on small screens.
+Before / After is below the output preview.

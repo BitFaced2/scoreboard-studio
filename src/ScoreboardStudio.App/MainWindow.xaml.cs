@@ -22,7 +22,8 @@ public partial class MainWindow : Window
     private readonly ObservableCollection<OutputCard> cards = [];
     private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromMilliseconds(100) };
     private NdiDiscovery? discovery;
-    private bool ready, updating, dirty, locked, output, drawing, dragging, resizing;
+    private bool ready, updating, dirty, locked, output, drawing, dragging;
+    private int resizeCorner = -1;
     private string kind = "None", setupName = "Untitled setup";
     private string? savePath;
     private string? stillPath;
@@ -44,12 +45,29 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        UpdatePreviewBackground();
         var work=SystemParameters.WorkArea;
         Width=Math.Min(1440,work.Width);Height=Math.Min(940,work.Height);
         MinWidth=Math.Min(900,work.Width);MinHeight=Math.Min(580,work.Height);
+        WindowState=WindowState.Maximized;
         FieldList.ItemsSource = fields;
         OutputCards.ItemsSource = cards;
         ready = true;
+        WorkspaceTabs.SelectionChanged+=(_,e)=>{if(e.Source==WorkspaceTabs){PopulateOutputInspector();UpdateCompositionView();}};
+        CompositionViewbox.SizeChanged+=(_,_)=>RenderCompositionBoxes();
+        WorkspaceTabs.SizeChanged+=(_,_)=>
+        {
+            CompositionViewbox.MaxHeight=Math.Clamp(WorkspaceTabs.ActualHeight-360,150,420);
+            FieldToolsScroll.MaxHeight=Math.Clamp(WorkspaceTabs.ActualHeight*.25,110,220);
+        };
+        SizeChanged+=(_,_)=>
+        {
+            bool compact=ActualWidth<1200;
+            SourceColumn.Width=new GridLength(compact?190:225);
+            InspectorColumn.Width=new GridLength(compact?280:310);
+            HeaderBrandText.Visibility=compact?Visibility.Collapsed:Visibility.Visible;
+            HeaderLogo.Width=compact?72:106;
+        };
         SyncFields();
         SetupTitle.Text = setupName;
         timer.Tick += (_, _) => RefreshPreview();
@@ -61,13 +79,15 @@ public partial class MainWindow : Window
         try
         {
             bool available = await Task.Run(NdiRuntime.Initialize);
-            RuntimeStatus.Text = available ? "NDI READY   •   Local processing   •   No OCR" : "NDI UNAVAILABLE   •   Local image and video files are available";
-            RuntimeStatus.ToolTip = NdiRuntime.LibraryPath ?? NdiRuntime.Status;
             if (available) discovery = new NdiDiscovery();
             RefreshSources();
             PushPlan(); timer.Start();
             var args = Environment.GetCommandLineArgs();
             CompleteUpdateStartup(args);
+            int colorIndex=Array.IndexOf(args,"--color-smoke-test");
+            if(colorIndex>=0&&args.Length>colorIndex+1){await ColorSmokeTest(args[colorIndex+1]);return;}
+            int compositionIndex=Array.IndexOf(args,"--composition-smoke-test");
+            if(compositionIndex>=0&&args.Length>compositionIndex+1){await CompositionSmokeTest(args[compositionIndex+1]);return;}
             if(args.Contains("--update-test-exit")) {dirty=false;Close();return;}
             int updateIndex=Array.IndexOf(args,"--update-smoke-test");
             if(updateIndex>=0&&args.Length>updateIndex+1) {await UpdateSmokeTest(args[updateIndex+1]);return;}
@@ -79,7 +99,7 @@ public partial class MainWindow : Window
         catch (Exception ex) { Notice.Text = ex.Message; }
     }
 
-    private void PushPlan() => engine.Configure(new(kind, source, still, fields.Select(f => f.Snapshot()).ToArray(), output, generation, perspective with { }, video, stabilization));
+    private void PushPlan() => engine.Configure(new(kind, source, still, fields.Select(f => f.Snapshot()).ToArray(), output, generation, perspective with { }, video, stabilization,outputSettings with {}));
     private void Changed(bool preserveInitialPlacement = false)
     {
         CancelDetection(cancelInitial: !preserveInitialPlacement);
@@ -89,6 +109,7 @@ public partial class MainWindow : Window
     }
     private void SyncFields()
     {
+        PlaceNewOutputFields();
         var selected = Selected;
         FieldList.Items.Refresh();
         if (selected is not null && fields.Contains(selected)) FieldList.SelectedItem = selected;
@@ -98,6 +119,7 @@ public partial class MainWindow : Window
         Inspector.IsEnabled = Selected is not null && !locked;
         EmptyFieldsText.Visibility = fields.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         RenderBoxes();
+        SyncComposition();
     }
     private void RefreshSources()
     {
@@ -120,6 +142,7 @@ public partial class MainWindow : Window
             VideoTime.Text = $"{video.Position:mm\\:ss} / {video.Duration:mm\\:ss}";
         }
         var preview = engine.Preview;
+        RefreshCompositionPreview();
         if(!initialPlacementFinished && fields.Count==0 && preview.Generation==generation && preview.Healthy && preview.Source is not null && !locked && !drawing && !EditingPerspective)
         {
             initialPlacementFinished=true;
@@ -139,11 +162,20 @@ public partial class MainWindow : Window
             if(WorkspaceTabs.SelectedIndex==0)UpdateImage(SourceImage,frame);
             SourceImage.Opacity = preview.Healthy ? 1 : .3;
             FrameInfo.Text = $"{frame.Width} × {frame.Height}  •  {fields.Count} fields  •  {preview.ProcessingMs:0} ms processing";
-            if(WorkspaceTabs.SelectedIndex==1)UpdateImage(OriginalPreview,Selected is { } field && preview.Source is { } working ? FrameProcessor.Crop(working, field.Region) : null);
         }
         else { UpdateImage(SourceImage,null);UpdateImage(OriginalPreview,null); FrameInfo.Text = "Waiting for a video source"; }
-        if(WorkspaceTabs.SelectedIndex==1)UpdateImage(CleanPreview,Selected is { } selected && preview.Fields.TryGetValue(selected.Id, out var clean) ? clean : null);
-        if (WorkspaceTabs.SelectedIndex == 2)
+        if(WorkspaceTabs.SelectedIndex==1 && ComparisonSection.IsExpanded)
+        {
+            ComparisonFieldName.Text=Selected?.Name ?? "No field selected";
+            bool hasComparison=Selected is {} && preview.Healthy && preview.Source is not null;
+            ComparisonEmpty.Visibility=hasComparison?Visibility.Collapsed:Visibility.Visible;
+            ComparisonEmpty.Text=Selected is null?"Select a field on the left to compare its original crop and cleaned digits.":"Load media or connect a source to preview this field.";
+            ComparisonPanels.Visibility=hasComparison?Visibility.Visible:Visibility.Collapsed;
+            UpdateImage(OriginalPreview,hasComparison?FrameProcessor.Crop(preview.Source!,Selected!.Region):null);
+            UpdateImage(CleanPreview,hasComparison&&preview.Fields.TryGetValue(Selected!.Id,out var clean)?clean:null);
+        }
+        else { UpdateImage(OriginalPreview,null);UpdateImage(CleanPreview,null); }
+        if (WorkspaceTabs.SelectedIndex == 1)
             foreach (var card in cards)
             {
                 card.Image = preview.Fields.TryGetValue(card.Id, out var fieldFrame) ? UpdateBitmap(card.Image,fieldFrame) : null;
@@ -183,7 +215,8 @@ public partial class MainWindow : Window
         kind = newKind; source = newSource; still = image; generation++;
         stillPath = null;
         EndPerspectiveEditing();
-        suggestions.Clear(); AcceptDetection.Visibility = Visibility.Collapsed; beforeDetection = null; UndoDetection.Visibility = Visibility.Collapsed;
+        suggestions.Clear(); AcceptDetection.Visibility = Visibility.Collapsed; beforeDetection = null; beforeDetectionPerspective = null;
+        UndoDetection.Content = "Undo detection"; UndoDetection.Visibility = Visibility.Collapsed;
         drawing = false; DrawButton.Content = "+ Draw a field";
         SyncFields(); Changed(preserveInitialPlacement:true);
         Notice.Text = newKind == "NDI" ? "Source connected. Review every crop before starting outputs." : newKind == "Image" ? "Image loaded. Draw fields or load a saved setup." : "Video loaded. Draw fields or load a saved setup.";
@@ -227,7 +260,7 @@ public partial class MainWindow : Window
     private void FieldSelected(object sender, SelectionChangedEventArgs e)
     {
         if (!ready) return;
-        PopulateInspector(); RenderBoxes();
+        PopulateInspector(); RenderBoxes();PopulateOutputInspector();RenderCompositionBoxes();
     }
     private void PopulateInspector()
     {
@@ -240,22 +273,16 @@ public partial class MainWindow : Window
             IsolationMode.SelectedIndex = c.Isolation == "White highlights" ? 1 : 0;
             RemoveBackground.IsChecked = c.RemoveBackground; Threshold.Value = c.Threshold; Softness.Value = c.Softness;
             Brightness.Value = c.Brightness; Thickness.Value = c.Thickness; SmoothEdges.IsChecked = c.Smooth; Speckles.IsChecked = c.RemoveSpeckles;
-            DigitColor.SelectedIndex = c.Color == "Original" ? 1 : c.Color == "Custom" ? 2 : 0; CustomColor.Text = c.CustomColor;
+            DigitColor.SelectedIndex = c.Color == "Original" ? 1 : c.Color == "Custom" ? 2 : 0;
         }
-        updating = false; UpdateSliderLabels();
-    }
-    private void PopulateCrop()
-    {
-        if (Selected is not { } f) return;
-        CropX.Text = (f.Region.X * 100).ToString("0.0", CultureInfo.InvariantCulture); CropY.Text = (f.Region.Y * 100).ToString("0.0", CultureInfo.InvariantCulture);
-        CropW.Text = (f.Region.Width * 100).ToString("0.0", CultureInfo.InvariantCulture); CropH.Text = (f.Region.Height * 100).ToString("0.0", CultureInfo.InvariantCulture);
+        updating = false; UpdateSliderLabels();PopulateOutputInspector();
     }
     private void UpdateSliderLabels()
     {
         if (!ready) return;
         ThresholdValue.Text = $"{Threshold.Value:0}"; SoftnessValue.Text = $"{Softness.Value:0}";
         BrightnessValue.Text = $"{Brightness.Value:0.00}×"; ThicknessValue.Text = $"{Thickness.Value:+0;-0;0} px";
-        CustomColor.IsEnabled = DigitColor.SelectedIndex == 2;
+        RefreshColorSwatches();
     }
     private void ReadCleanup()
     {
@@ -263,19 +290,14 @@ public partial class MainWindow : Window
         field.Cleanup = new Cleanup { Threshold = (int)Threshold.Value, Softness = (int)Softness.Value, Brightness = Brightness.Value,
             Isolation = IsolationMode.SelectedIndex == 1 ? "White highlights" : "Bright colors",
             Thickness = (int)Thickness.Value, Smooth = SmoothEdges.IsChecked == true, RemoveSpeckles = Speckles.IsChecked == true,
-            RemoveBackground = RemoveBackground.IsChecked == true, Color = ((ComboBoxItem)DigitColor.SelectedItem).Content.ToString()!, CustomColor = CustomColor.Text }.Validated();
+            RemoveBackground = RemoveBackground.IsChecked == true, Color = ((ComboBoxItem)DigitColor.SelectedItem).Content.ToString()!, CustomColor = field.Cleanup.CustomColor }.Validated();
+        field.OutputColor=null;
         field.Enabled = FieldEnabled.IsChecked == true;
-        UpdateSliderLabels(); Changed();
+        UpdateSliderLabels(); Changed();RenderCompositionBoxes();
     }
     private void SliderChanged(object sender, RoutedPropertyChangedEventArgs<double> e) => ReadCleanup();
     private void CleanupChanged(object sender, RoutedEventArgs e) => ReadCleanup();
     private void ColorChanged(object sender, SelectionChangedEventArgs e) => ReadCleanup();
-    private void CustomColorChanged(object sender, RoutedEventArgs e)
-    {
-        if (!ready || updating) return;
-        if (!System.Text.RegularExpressions.Regex.IsMatch(CustomColor.Text, "^#[0-9a-fA-F]{6}$")) { Notice.Text = "Enter a color as #RRGGBB, for example #FFFFFF."; return; }
-        ReadCleanup();
-    }
     private void RenameField(object sender, RoutedEventArgs e)
     {
         if (!ready || updating || locked || Selected is not { } field) return;
@@ -286,30 +308,17 @@ public partial class MainWindow : Window
         field.Name = name; SyncFields(); Changed();
     }
     private void NameKeyDown(object sender, KeyEventArgs e) { if (e.Key == Key.Enter) { RenameField(sender, e); Keyboard.ClearFocus(); } }
-    private void ApplyCropClick(object sender, RoutedEventArgs e)
-    {
-        if (locked || Selected is not { } field) return;
-        var values = new double[4]; TextBox[] controls = [CropX, CropY, CropW, CropH];
-        for (int i = 0; i < 4; i++)
-            if (!double.TryParse(controls[i].Text, NumberStyles.Float, CultureInfo.InvariantCulture, out values[i]) || !double.IsFinite(values[i])) { Notice.Text = "Enter crop percentages as numbers, for example 25.5."; return; }
-        if (values[0] < 0 || values[1] < 0 || values[2] <= 0 || values[3] <= 0 || values[0] + values[2] > 100.1 || values[1] + values[3] > 100.1) { Notice.Text = "The crop must fit inside the image, with positive width and height."; return; }
-        field.Region = new Crop(values[0] / 100, values[1] / 100, values[2] / 100, values[3] / 100).Clamp();
-        PopulateCrop(); RenderBoxes(); Changed();
-    }
     private void ApplyAllClick(object sender, RoutedEventArgs e)
     {
         if (locked || Selected is not { } field) return;
-        foreach (var f in fields) f.Cleanup = field.Cleanup with { };
+        foreach (var f in fields) { f.Cleanup = field.Cleanup with { }; f.OutputColor=null; }
         Changed(); Notice.Text = "Cleanup settings applied to every field.";
     }
-    private void ResetCleanupClick(object sender, RoutedEventArgs e) { if (!locked && Selected is { } f) { f.Cleanup = new(); PopulateInspector(); Changed(); } }
-    private void CleanupTabClick(object sender, RoutedEventArgs e) => WorkspaceTabs.SelectedIndex = 1;
-    private void BackgroundChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (CleanPreviewBorder is null) return;
-        CleanPreviewBorder.Background = PreviewBackground.SelectedIndex == 1 ? Brush("#080B10") : PreviewBackground.SelectedIndex == 2 ? Brush("#E9EEF4") : (System.Windows.Media.Brush)FindResource("Checker");
-    }
-
+    private void ResetCleanupClick(object sender, RoutedEventArgs e) { if (!locked && Selected is { } f) { f.Cleanup = new(); f.OutputColor=null; PopulateInspector(); Changed(); } }
+    private void OutputsTabClick(object sender, RoutedEventArgs e) => WorkspaceTabs.SelectedIndex = 1;
+    private void ComparisonChanged(object sender, RoutedEventArgs e) { if(ready)RefreshPreview(); }
+    private void ComparisonSizeChanged(object sender, SizeChangedEventArgs e)
+    { ComparisonPanels.Columns=e.NewSize.Width<520?1:2; }
     private async void DetectClick(object sender, RoutedEventArgs e)
     {
         if (locked || engine.Preview.Source is not { } frame || !engine.Preview.Healthy) { Notice.Text = "A healthy source is needed to detect fields."; return; }
@@ -335,6 +344,7 @@ public partial class MainWindow : Window
     {
         if (locked || suggestions.Count == 0) return;
         beforeDetection = fields.Select(f => f.Snapshot()).ToArray();
+        beforeDetectionPerspective = null; UndoDetection.Content = "Undo detection";
         fields.Clear();
         for (int i = 0; i < suggestions.Count; i++) fields.Add(new() {
             Name = $"Field {i + 1}", Region = suggestions[i],
@@ -347,8 +357,18 @@ public partial class MainWindow : Window
     private void UndoDetectionClick(object sender, RoutedEventArgs e)
     {
         if (locked || beforeDetection is null) return;
+        CancelDetection();
+        bool restoringCorrection = beforeDetectionPerspective is not null;
+        if (beforeDetectionPerspective is {} previousView)
+        {
+            perspective = previousView; beforeDetectionPerspective = null;
+            ResetStabilization(); output = false; OutputButton.Content = "Start NDI outputs";
+            UpdatePerspectiveStatus();
+        }
         fields.Clear(); foreach (var f in beforeDetection) fields.Add(f); beforeDetection = null;
-        UndoDetection.Visibility = Visibility.Collapsed; DetectionHint.Text = "Previous fields restored."; SyncFields(); Changed();
+        UndoDetection.Content = "Undo detection";
+        UndoDetection.Visibility = Visibility.Collapsed; DetectionHint.Text = restoringCorrection ? "Previous view and fields restored." : "Previous fields restored.";
+        SyncFields(); PopulateInspector(); Changed(); Notice.Text = DetectionHint.Text;
     }
     private void DrawClick(object sender, RoutedEventArgs e)
     {
@@ -391,17 +411,29 @@ public partial class MainWindow : Window
         }
         if (!drawing)
         {
-            var field = fields.Reverse().FirstOrDefault(f => dragStart.X >= f.Region.X && dragStart.X <= f.Region.X + f.Region.Width && dragStart.Y >= f.Region.Y && dragStart.Y <= f.Region.Y + f.Region.Height);
+            double hitX=CanvasUnits(FieldCornerGrabRadius)/VideoSurface.Width, hitY=CanvasUnits(FieldCornerGrabRadius)/VideoSurface.Height;
+            var field = Selected is {} active && HitResizeCorner(active.Region,dragStart,hitX,hitY)>=0 ? active :
+                fields.Reverse().FirstOrDefault(f => HitResizeCorner(f.Region,dragStart,hitX,hitY)>=0 || ContainsPoint(f.Region,dragStart));
             if (field is null) return;
             FieldList.SelectedItem = field; dragOriginal = field.Region;
-            resizing = Math.Abs(dragStart.X - field.Region.X - field.Region.Width) * VideoSurface.Width < 28 && Math.Abs(dragStart.Y - field.Region.Y - field.Region.Height) * VideoSurface.Height < 28;
+            resizeCorner = HitResizeCorner(field.Region,dragStart,hitX,hitY);
+            BoxCanvas.Cursor=FieldDragCursor(resizeCorner);
         }
         dragging = true; BoxCanvas.CaptureMouse(); e.Handled = true;
     }
     private void CanvasMove(object sender, MouseEventArgs e)
     {
-        if (!dragging || locked) return;
+        if (locked) return;
         var p = NormalPoint(e);
+        if (!dragging)
+        {
+            if(drawing || EditingPerspective)return;
+            double hitX=CanvasUnits(FieldCornerGrabRadius)/VideoSurface.Width,hitY=CanvasUnits(FieldCornerGrabRadius)/VideoSurface.Height;
+            var hovered=Selected is {} active && HitResizeCorner(active.Region,p,hitX,hitY)>=0 ? active :
+                fields.Reverse().FirstOrDefault(f=>HitResizeCorner(f.Region,p,hitX,hitY)>=0 || ContainsPoint(f.Region,p));
+            BoxCanvas.Cursor=hovered is null?Cursors.Arrow:FieldDragCursor(HitResizeCorner(hovered.Region,p,hitX,hitY));
+            return;
+        }
         if (EditingPerspective && cornerDragging >= 0)
         {
             MoveCorner(cornerDragging,new(p.X,p.Y));return;
@@ -410,7 +442,7 @@ public partial class MainWindow : Window
         else if (Selected is { } f && dragOriginal is { } r)
         {
             double dx = p.X - dragStart.X, dy = p.Y - dragStart.Y;
-            f.Region = resizing ? new Crop(r.X, r.Y, Math.Clamp(r.Width + dx, .005, 1 - r.X), Math.Clamp(r.Height + dy, .005, 1 - r.Y)) : r with { X = Math.Clamp(r.X + dx, 0, 1 - r.Width), Y = Math.Clamp(r.Y + dy, 0, 1 - r.Height) };
+            f.Region = ResizeOrMoveBox(r,dx,dy,resizeCorner,.005,.005);
             PopulateCrop(); PushPlan();
         }
         RenderBoxes();
@@ -427,7 +459,7 @@ public partial class MainWindow : Window
         dragging = false; drawing = false; draft = null; DrawButton.Content = "+ Draw a field";
         BoxCanvas.ReleaseMouseCapture(); BoxCanvas.Cursor = Cursors.Arrow; RenderBoxes(); Changed();
     }
-    private void CanvasLostCapture(object sender, MouseEventArgs e) { if (e.OriginalSource==BoxCanvas && dragging) { dragging = false; cornerDragging=-1; draft = null; RenderBoxes(); if (!EditingPerspective) Changed(); } }
+    private void CanvasLostCapture(object sender, MouseEventArgs e) { if (e.OriginalSource==BoxCanvas && dragging) { dragging = false; cornerDragging=-1; draft = null; BoxCanvas.Cursor=Cursors.Arrow; RenderBoxes(); if (!EditingPerspective) Changed(); } }
     private void RenderBoxes()
     {
         if (!ready) return;
@@ -449,34 +481,39 @@ public partial class MainWindow : Window
         Canvas.SetLeft(text, crop.X * w); Canvas.SetTop(text, Math.Max(0, crop.Y * h - 34)); BoxCanvas.Children.Add(text);
         if (selected)
         {
-            var grip = new Rectangle { Width = 20, Height = 20, Fill = Brush(color), IsHitTestVisible = false };
-            Canvas.SetLeft(grip, (crop.X + crop.Width) * w - 20); Canvas.SetTop(grip, (crop.Y + crop.Height) * h - 20); BoxCanvas.Children.Add(grip);
+            DrawResizeGrips(BoxCanvas,crop.X*w,crop.Y*h,crop.Width*w,crop.Height*h,CanvasUnits(1),color);
         }
     }
 
     private void OutputClick(object sender, RoutedEventArgs e)
     {
+        if (perspectiveDetectionPending) { Notice.Text = "Wait for the corrected-view fields to finish updating before starting outputs."; return; }
         if (!output)
         {
             if (!NdiRuntime.Available) { Notice.Text = NdiRuntime.Status; return; }
             if (EditingPerspective) { Notice.Text = "Apply or cancel the perspective correction before starting outputs."; return; }
             if (!engine.Preview.Healthy || !fields.Any(f => f.Enabled)) { Notice.Text = "Select a healthy source and enable at least one field first."; return; }
+            if(outputSettings.Mode=="Combined"&&!fields.Any(f=>f.Enabled&&f.OutputRegion is not null)){Notice.Text="Place at least one enabled field on the Outputs canvas before starting the combined feed.";WorkspaceTabs.SelectedIndex=1;return;}
         }
         output = !output; OutputButton.Content = output ? "Stop NDI outputs" : "Start NDI outputs"; PushPlan();
         Notice.Text = output ? "NDI outputs are starting. Open the Outputs tab for the names to select in vMix." : "NDI outputs stopped.";
     }
     private void LiveClick(object sender, RoutedEventArgs e)
     {
+        if (perspectiveDetectionPending) { Notice.Text = "Wait for the corrected-view fields to finish updating before locking for live."; return; }
         if (EditingPerspective) { Notice.Text = "Apply or cancel the perspective correction before locking for live."; return; }
         locked = !locked;
         LiveButton.Content = locked ? "Unlock editing" : "Lock for live";
         SourceControls.IsEnabled = FieldActions.IsEnabled = DetectionControls.IsEnabled = !locked;
+        OutputMode.IsEnabled=OutputLayoutControls.IsEnabled=PlacementActions.IsEnabled=!locked;
         Inspector.IsEnabled = !locked && Selected is not null;
-        if (locked) { drawing = false; draft = null; BoxCanvas.ReleaseMouseCapture(); WorkspaceTabs.SelectedIndex = 2; }
+        if (locked) { drawing = false; draft = null; BoxCanvas.ReleaseMouseCapture(); WorkspaceTabs.SelectedIndex = 1; }
+        CompositionCanvas.ReleaseMouseCapture();RenderCompositionBoxes();
         RenderBoxes(); Notice.Text = locked ? "Live lock is on. Source and field settings are protected; outputs can still be stopped." : "Editing unlocked.";
     }
     private bool SaveSetup()
     {
+        if (perspectiveDetectionPending) { Notice.Text = "Wait for the corrected-view fields to finish updating before saving."; return false; }
         if (EditingPerspective) { Notice.Text = "Apply or cancel the perspective correction before saving."; return false; }
         RenameField(this, new());
         if (savePath is null)
@@ -488,7 +525,7 @@ public partial class MainWindow : Window
         try
         {
             setupName = System.IO.Path.GetFileName(savePath).Replace(".scoreboard.json", "");
-            new Layout { Name = setupName, SourceName = source?.Name, Perspective = perspective with { },
+            new Layout { Name = setupName, SourceName = source?.Name, Perspective = perspective with { },Output=SavedOutput(savePath),
                 ImagePath = stillPath is null ? null : System.IO.Path.GetRelativePath(System.IO.Path.GetDirectoryName(savePath)!, stillPath),
                 VideoPath = videoPath is null ? null : System.IO.Path.GetRelativePath(System.IO.Path.GetDirectoryName(savePath)!, videoPath),
                 Fields = fields.Select(f => f.Snapshot()).ToList() }.Save(savePath);
@@ -532,6 +569,8 @@ public partial class MainWindow : Window
         {
             Directory.CreateDirectory(directory);
             await Task.Delay(200); RefreshPreview(); UpdateLayout();
+            if(WindowState!=WindowState.Maximized)throw new Exception("App must start maximized.");
+            WindowState=WindowState.Normal;
             double initialWidth=Width,initialHeight=Height;
             Width=1000;Height=650;await Task.Delay(100);UpdateLayout();
             if(ActualWidth>1001 || ActualHeight>651 || ResizeMode!=ResizeMode.CanResizeWithGrip)throw new Exception("Window cannot resize to laptop dimensions.");
@@ -589,13 +628,34 @@ public partial class MainWindow : Window
             if (fields[1].Cleanup.Threshold != 120) throw new Exception("Cleanup UI did not update the processing settings.");
             FieldName.Text = "Home points"; RenameField(this, new());
             if (fields[1].Name != "Home points") throw new Exception("Rename did not persist.");
-            CropX.Text = "15"; CropY.Text = "47"; CropW.Text = "17"; CropH.Text = "22"; ApplyCropClick(this, new());
+            CropW.Value = 17; CropH.Value = 22; CropX.Value = 15; CropY.Value = 47;
             if (Math.Abs(fields[1].Region.X - .15) > .001) throw new Exception("Crop controls did not update.");
             fields[1].Name = originalField.Name; fields[1].Region = originalField.Region; fields[1].Cleanup = originalField.Cleanup;
             SyncFields(); PushPlan();
             FieldList.SelectedIndex = 0;
             if (FieldList.SelectedItems.Count != 1 || Selected != fields[0] || FieldName.Text != "Game clock") throw new Exception("Selection changed incorrectly after editing a field.");
-            for (int tab = 0; tab < 3; tab++)
+            if(WorkspaceTabs.Items.Count!=2 || ComparisonSection.IsExpanded)throw new Exception("Expected two tabs and a collapsed comparison.");
+            OutputMode.SelectedIndex=0;
+            OutputsTabClick(this,new());
+            if(WorkspaceTabs.SelectedIndex!=1 || OutputPlacementInspector.Visibility!=Visibility.Visible)throw new Exception("Outputs navigation or inspector did not follow the two-tab layout.");
+            ComparisonSection.IsExpanded=true;RefreshPreview();
+            if(OriginalPreview.Source is null || CleanPreview.Source is null || ComparisonFieldName.Text!=fields[0].Name)throw new Exception("Selected-field comparison did not render.");
+            FieldList.SelectedIndex=1;RefreshPreview();
+            if(ComparisonFieldName.Text!=fields[1].Name || !ReferenceEquals(CleanPreview.Tag,engine.Preview.Fields[fields[1].Id]))throw new Exception("Comparison did not follow field selection.");
+            OutputMode.SelectedIndex=1;RefreshPreview();
+            if(ComparisonPanels.Visibility!=Visibility.Visible || CleanPreview.Source is null)throw new Exception("Comparison unavailable in Separate Inputs mode.");
+            OutputMode.SelectedIndex=0;
+            Width=1000;Height=780;await Task.Delay(150);UpdateLayout();
+            if(ComparisonPanels.Columns!=1)throw new Exception("Comparison did not stack in a narrow window.");
+            CaptureWindow(System.IO.Path.Combine(directory,"comparison-small.png"));
+            Width=1440;Height=940;await Task.Delay(150);UpdateLayout();
+            if(ComparisonPanels.Columns!=2)throw new Exception("Comparison did not use two columns in a wide window.");
+            FieldList.SelectedIndex=-1;RefreshPreview();
+            if(OriginalPreview.Source is not null || CleanPreview.Source is not null || ComparisonEmpty.Visibility!=Visibility.Visible)throw new Exception("Comparison retained the previous field after deselection.");
+            FieldList.SelectedIndex=0;
+            ComparisonSection.IsExpanded=false;RefreshPreview();
+            if(OriginalPreview.Source is not null || CleanPreview.Source is not null)throw new Exception("Collapsed comparison retained rendered frames.");
+            for (int tab = 0; tab < 2; tab++)
             {
                 WorkspaceTabs.SelectedIndex = tab; await Task.Delay(300); RefreshPreview(); UpdateLayout();
                 var bitmap = new RenderTargetBitmap((int)ActualWidth, (int)ActualHeight, 96, 96, PixelFormats.Pbgra32);
@@ -608,7 +668,8 @@ public partial class MainWindow : Window
             OpenLayout(fixturePath);
             for(int i=0;i<100 && engine.Preview.Fields.Count!=10;i++) await Task.Delay(100);
             if(kind!="Image" || fields.Count!=10 || IsolationMode.SelectedIndex!=1 || output) throw new Exception("Real scoreboard sample did not load as a stopped still image with white-highlight cleanup.");
-            WorkspaceTabs.SelectedIndex=1;await Task.Delay(150);RefreshPreview();UpdateLayout();
+            WorkspaceTabs.SelectedIndex=1;ComparisonSection.IsExpanded=true;await Task.Delay(150);RefreshPreview();UpdateLayout();
+            ComparisonSection.BringIntoView();await Task.Delay(100);UpdateLayout();
             CaptureWindow(System.IO.Path.Combine(directory,"real-scoreboard-cleanup.png"));
             PerspectiveClick(this,new());
             if(!EditingPerspective || Inspector.IsEnabled || FieldActions.IsEnabled || output) throw new Exception("Perspective editor did not protect field geometry or stop outputs.");
@@ -622,11 +683,13 @@ public partial class MainWindow : Window
             perspectiveDraft.BottomRight=new(.95,.98);perspectiveDraft.BottomLeft=new(.04,.96);
             RenderBoxes();UpdateLayout();CaptureWindow(System.IO.Path.Combine(directory,"perspective-editor.png"));
             PerspectiveWidth.Text="1280";PerspectiveHeight.Text="720";ApplyPerspectiveClick(this,new());
+            await perspectiveDetectionTask;
             for(int i=0;i<100 && engine.Preview.Source?.Width!=1280;i++) await Task.Delay(100);
             if(!perspective.Enabled || EditingPerspective || engine.Preview.Source?.Width!=1280 || engine.Preview.RawSource?.Width!=1320) throw new Exception("Perspective correction did not reach the worker pipeline.");
             PerspectiveClick(this,new());perspectiveDraft!.TopLeft=new(.1,.1);CancelPerspectiveClick(this,new());
             if(perspective.TopLeft.X!=.025) throw new Exception("Cancel altered the accepted correction.");
             PerspectiveClick(this,new());ResetPerspectiveClick(this,new());
+            await perspectiveDetectionTask;
             if(perspective.Enabled) throw new Exception("Perspective reset failed.");
             string? recovery=SaveRecovery();
             if(recovery is null || Layout.Load(recovery).Fields.Count!=fields.Count)throw new Exception("Recovery setup could not be restored.");

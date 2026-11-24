@@ -10,6 +10,7 @@ artifacts/
 /samples/real-scoreboard/scoreboard.png
 /TMS_logo.png
 /*.mp4
+/scorebug/
 
 # Local credentials and editor state
 .env

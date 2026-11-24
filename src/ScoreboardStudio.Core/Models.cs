@@ -49,10 +49,16 @@ public sealed class ScoreField
     public Crop Region { get; set; } = new(.1, .1, .2, .2);
     public Cleanup Cleanup { get; set; } = new();
     public bool Enabled { get; set; } = true;
+    public Crop? OutputRegion {get;set;}
+    public bool OutputPlacementInitialized {get;set;}
+    public string OutputFit {get;set;}="Stretch";
+    public string? OutputColor {get;set;}
+    public string? OutputSlot {get;set;}
     public override string ToString() => Name;
     // Identity must stay stable while the editor changes the name and crop.
     // Mutable record value equality breaks WPF's selected-item tracking.
-    public ScoreField Snapshot() => new() { Id = Id, Name = Name, Region = Region, Cleanup = Cleanup with { }, Enabled = Enabled };
+    public ScoreField Snapshot() => new() { Id = Id, Name = Name, Region = Region, Cleanup = Cleanup with { }, Enabled = Enabled,
+        OutputRegion=OutputRegion,OutputPlacementInitialized=OutputPlacementInitialized,OutputFit=OutputFit,OutputColor=OutputColor,OutputSlot=OutputSlot };
 }
 
 public sealed class Layout
@@ -63,11 +69,13 @@ public sealed class Layout
     public string? ImagePath { get; set; }
     public string? VideoPath { get; set; }
     public PerspectiveSettings Perspective { get; set; } = new();
+    public OutputSettings Output {get;set;}=new();
     public List<ScoreField> Fields { get; set; } = [];
     private static readonly JsonSerializerOptions Options = new() { WriteIndented = true };
 
     public void Save(string path)
     {
+        Version=2;
         var temporary = path + ".tmp";
         File.WriteAllText(temporary, JsonSerializer.Serialize(this, Options));
         File.Move(temporary, path, true);
@@ -78,7 +86,9 @@ public sealed class Layout
         if (new FileInfo(path).Length > 2_000_000) throw new InvalidDataException("This setup file is too large.");
         var layout = JsonSerializer.Deserialize<Layout>(File.ReadAllText(path), Options)
             ?? throw new InvalidDataException("The setup file is empty.");
-        if (layout.Version != 1) throw new InvalidDataException("This setup version is not supported.");
+        if (layout.Version is not (1 or 2)) throw new InvalidDataException("This setup version is not supported.");
+        if(layout.Version==1)layout.Output=new();
+        if(layout.Output is null || !layout.Output.IsValid())throw new InvalidDataException("Invalid output canvas settings.");
         if (!string.IsNullOrWhiteSpace(layout.ImagePath) && !string.IsNullOrWhiteSpace(layout.VideoPath))
             throw new InvalidDataException("A setup cannot reference both an image and a video.");
         if (layout.Perspective is null || !layout.Perspective.IsValid(out var reason))
@@ -94,6 +104,14 @@ public sealed class Layout
             if (!names.Add(field.Name)) throw new InvalidDataException("Field names must be unique.");
             field.Region = field.Region.Clamp();
             field.Cleanup = field.Cleanup.Validated();
+            if(field.OutputRegion is {} outputRegion)
+            {
+                if(!double.IsFinite(outputRegion.X)||!double.IsFinite(outputRegion.Y)||!double.IsFinite(outputRegion.Width)||!double.IsFinite(outputRegion.Height)||outputRegion.Width<=0||outputRegion.Height<=0)
+                    throw new InvalidDataException("Invalid field output position.");
+                field.OutputRegion=outputRegion.Clamp();
+            }
+            if(field.OutputFit is not ("Contain" or "Stretch"))throw new InvalidDataException("Invalid field sizing mode.");
+            if(field.OutputColor is not null && !FieldComposition.TryColor(field.OutputColor,out _,out _,out _))throw new InvalidDataException("Invalid output field color.");
         }
         return layout;
     }
