@@ -634,7 +634,7 @@ public partial class MainWindow : Window
             SyncFields(); PushPlan();
             FieldList.SelectedIndex = 0;
             if (FieldList.SelectedItems.Count != 1 || Selected != fields[0] || FieldName.Text != "Game clock") throw new Exception("Selection changed incorrectly after editing a field.");
-            if(WorkspaceTabs.Items.Count!=2 || ComparisonSection.IsExpanded)throw new Exception("Expected two tabs and a collapsed comparison.");
+            if(WorkspaceTabs.Items.Count!=2 || !ComparisonSection.IsExpanded)throw new Exception("Expected two tabs and an expanded comparison.");
             OutputMode.SelectedIndex=0;
             OutputsTabClick(this,new());
             if(WorkspaceTabs.SelectedIndex!=1 || OutputPlacementInspector.Visibility!=Visibility.Visible)throw new Exception("Outputs navigation or inspector did not follow the two-tab layout.");

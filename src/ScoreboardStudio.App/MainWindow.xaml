@@ -251,7 +251,7 @@
         <DockPanel>
           <ScrollViewer x:Name="SourceScroll" DockPanel.Dock="Top" MaxHeight="300" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="0,0,0,12">
           <StackPanel x:Name="SourceControls" Margin="0,0,4,0">
-            <Expander x:Name="NdiSourceSection" Header="NDI source" IsExpanded="False" Style="{StaticResource InspectorSection}"><StackPanel>
+            <Expander x:Name="NdiSourceSection" Header="NDI source" IsExpanded="True" Style="{StaticResource InspectorSection}"><StackPanel>
             <ComboBox x:Name="SourceCombo" ToolTip="Available NDI sources" />
             <WrapPanel Margin="0,9,0,0">
               <Button Content="Refresh" Click="RefreshClick" Margin="0,0,6,6" Padding="9,8"/>
@@ -308,7 +308,7 @@
                 <TextBlock Text="Select a box to move it. Drag any corner to resize." Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,6,0,14" />
                 <ScrollViewer x:Name="FieldToolsScroll" MaxHeight="245" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                 <UniformGrid x:Name="FieldToolGroups" Columns="2" Margin="0,0,4,0">
-                  <Expander x:Name="CameraSection" Margin="0,0,6,0" Header="Camera setup" IsExpanded="False" Style="{StaticResource InspectorSection}"><StackPanel>
+                  <Expander x:Name="CameraSection" Margin="0,0,6,0" Header="Camera setup" IsExpanded="True" Style="{StaticResource InspectorSection}"><StackPanel>
                     <WrapPanel>
                       <Button x:Name="PerspectiveButton" Content="Keystone Correction" Click="PerspectiveClick" Margin="0,0,7,8"/>
                       <Button x:Name="StabilizeButton" Content="Stabilize camera" Click="StabilizeClick" Margin="0,0,7,8"/>
@@ -319,7 +319,7 @@
                   <WrapPanel><TextBlock Text="Corrected size" VerticalAlignment="Center" Margin="0,0,8,0"/><TextBox x:Name="PerspectiveWidth" Width="58" Text="1280"/><TextBlock Text=" × " VerticalAlignment="Center"/><TextBox x:Name="PerspectiveHeight" Width="58" Text="720" Margin="0,0,10,0"/><Button Content="Apply" Style="{StaticResource Primary}" Click="ApplyPerspectiveClick"/><Button Content="Cancel" Click="CancelPerspectiveClick"/><Button Content="Reset correction" Click="ResetPerspectiveClick"/></WrapPanel>
                 </StackPanel>
                   </StackPanel></Expander>
-                  <Expander x:Name="DetectionSection" Margin="6,0,0,0" Header="Field detection" IsExpanded="False" Style="{StaticResource InspectorSection}"><StackPanel>
+                  <Expander x:Name="DetectionSection" Margin="6,0,0,0" Header="Field detection" IsExpanded="True" Style="{StaticResource InspectorSection}"><StackPanel>
                     <WrapPanel>
                   <Button x:Name="DetectButton" Content="Find fields" Margin="0,0,7,8" Click="DetectClick" />
                   <Button x:Name="AcceptDetection" Content="Replace fields with suggestions" Margin="0,0,7,8" Click="AcceptDetectionClick" Visibility="Collapsed" Style="{StaticResource Primary}" />
@@ -361,30 +361,29 @@
               <StackPanel Margin="18">
                 <TextBlock Text="Build your field output" FontSize="23" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,16" />
 
-                <StackPanel x:Name="OutputLayoutControls">
-
-                  <Expander x:Name="GuideSection" Header="Scorebug guide and canvas" IsExpanded="False" Style="{StaticResource InspectorSection}" Visibility="{Binding Visibility, ElementName=CanvasControls}"><StackPanel>
-                  <StackPanel x:Name="CanvasControls">
-                  <TextBlock Text="Positioning guide" Style="{StaticResource SectionTitle}"/>
-                  <WrapPanel Margin="0,0,0,12">
-                    <Button Content="Load scorebug guide" Click="LoadGuideClick" ToolTip="GTZIP, PNG, JPEG or BMP; guide is never sent"/>
-                    <Button Content="Clear guide" Click="ClearGuideClick"/>
-                  </WrapPanel>
-                  <TextBlock x:Name="GuideInfo" Text="Load your GTZIP as a positioning guide, or place fields on the transparent canvas." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,10,0,5"/>
-                  <TextBlock Text="Canvas size" Style="{StaticResource SectionTitle}"/>
-                  <WrapPanel Margin="0,0,0,8">
-                    <TextBox x:Name="CanvasWidthBox" Text="1920" Width="65"/><TextBlock Text=" × " VerticalAlignment="Center"/>
-                    <TextBox x:Name="CanvasHeightBox" Text="1080" Width="65" Margin="0,0,7,0"/>
-                    <Button Content="Apply size" Click="ApplyCanvasSizeClick"/>
-                  </WrapPanel>
-                  </StackPanel>
-                  </StackPanel></Expander>
-                </StackPanel>
                 <TextBlock Text="Output preview" Style="{StaticResource SectionTitle}"/>
+                <StackPanel x:Name="OutputLayoutControls">
+                  <WrapPanel x:Name="CanvasControls" Margin="0,0,0,6">
+                    <WrapPanel Margin="0,0,12,4">
+                      <Button Content="Load scorebug guide" Click="LoadGuideClick" ToolTip="GTZIP, PNG, JPEG or BMP; guide is never sent"/>
+                      <Button Content="Clear guide" Click="ClearGuideClick"/>
+                    </WrapPanel>
+                    <WrapPanel VerticalAlignment="Center" Margin="0,0,12,4">
+                      <TextBlock Text="Canvas" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                      <TextBox x:Name="CanvasWidthBox" Text="1920" Width="65" AutomationProperties.Name="Canvas width"/>
+                      <TextBlock Text=" &#xD7; " VerticalAlignment="Center"/>
+                      <TextBox x:Name="CanvasHeightBox" Text="1080" Width="65" Margin="0,0,7,0" AutomationProperties.Name="Canvas height"/>
+                      <Button Content="Apply size" Click="ApplyCanvasSizeClick"/>
+                    </WrapPanel>
+                    <TextBlock x:Name="GuideInfo" MaxWidth="260" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Foreground="{StaticResource Muted}" Margin="0,0,0,4"/>
+                  </WrapPanel>
+                </StackPanel>
                 <WrapPanel x:Name="OutputPreviewToolbar" Margin="0,0,0,8">
                   <WrapPanel x:Name="GuidePreviewControls" Visibility="{Binding Visibility, ElementName=CombinedPanel}" VerticalAlignment="Center">
                     <CheckBox x:Name="ShowGuide" Content="Show guide (preview only)" IsChecked="True" Click="CompositionViewChanged" Margin="0,5,16,5"/>
-                    <CheckBox x:Name="CloseUpGuide" Content="Close-up" IsChecked="False" Click="CompositionViewChanged" Margin="0,5,16,5"/>
+                    <CheckBox x:Name="CloseUpGuide" Content="Close-up" ToolTip="Enlarge the guide. All fields stay visible in the whole-canvas overview; use Find a field or the scrollbars to reach them." IsChecked="False" Click="CompositionViewChanged" Margin="0,5,16,5"/>
+                    <TextBlock Text="Guide opacity" VerticalAlignment="Center" Margin="0,5,8,5"/>
+                    <Slider x:Name="GuideOpacity" Minimum="0" Maximum="1" Value="0.55" SmallChange="0.05" LargeChange="0.1" Width="90" VerticalAlignment="Center" Margin="0,5,16,5" AutomationProperties.Name="Guide opacity" ToolTip="Dim the guide to see live digits clearly. Preview only."/>
                   </WrapPanel>
                   <WrapPanel VerticalAlignment="Center">
                     <TextBlock Text="Output mode" VerticalAlignment="Center" Margin="0,5,10,5"/>
@@ -403,15 +402,53 @@
                   </Button>
                 </WrapPanel>
                 <StackPanel x:Name="CombinedPanel">
-                  <Border x:Name="OutputPreviewBorder" Background="{Binding PreviewBackdrop, RelativeSource={RelativeSource AncestorType=Window}}" Padding="8" CornerRadius="5">
+                  <WrapPanel Margin="0,0,0,8" VerticalAlignment="Center">
+                    <TextBlock Text="Zoom" VerticalAlignment="Center" Margin="0,0,8,6"/>
+                    <Slider x:Name="CompositionZoom" Minimum="1" Maximum="32" Value="1" SmallChange="0.25" LargeChange="1" Width="130" VerticalAlignment="Center" Margin="0,0,8,6" ValueChanged="CompositionZoomChanged" AutomationProperties.Name="Output preview zoom"/>
+                    <TextBlock x:Name="CompositionZoomLabel" Text="1&#xD7;" Width="48" VerticalAlignment="Center" Margin="0,0,8,6"/>
+                    <Button Content="Fit canvas" Click="FitCompositionClick" Margin="0,0,8,6"/>
+                    <Button Content="Zoom to selected" Click="ZoomSelectedClick" Margin="0,0,8,6"/>
+                    <TextBlock Text="Scroll wheel to zoom; Space + drag to pan" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,6" FontSize="11"/>
+                  </WrapPanel>
+                  <Grid Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="180"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <StackPanel Margin="0,0,12,0">
+                      <TextBlock Text="Whole canvas · click to navigate" FontSize="10" Margin="0,0,0,4"/>
+                      <Viewbox Width="168" Height="95" Stretch="Uniform" HorizontalAlignment="Left">
+                        <Grid x:Name="CompositionOverview" Width="1920" Height="1080" ClipToBounds="True" Background="{Binding PreviewBackdrop, RelativeSource={RelativeSource AncestorType=Window}}">
+                          <Image x:Name="OverviewGuide" Opacity="{Binding Value, ElementName=GuideOpacity}" Stretch="Fill" IsHitTestVisible="False"/>
+                          <Image x:Name="OverviewFields" Stretch="Fill" IsHitTestVisible="False"/>
+                          <Canvas x:Name="OverviewCanvas" Background="Transparent" Cursor="Hand" MouseLeftButtonDown="CompositionOverviewDown"/>
+                        </Grid>
+                      </Viewbox>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1">
+                      <TextBlock Text="Find a field · keeps your zoom" FontSize="11" Margin="0,0,0,4"/>
+                      <ScrollViewer MaxHeight="74" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <WrapPanel x:Name="CompositionFieldLinks"/>
+                      </ScrollViewer>
+                      <Button Content="Go to guide" Click="GoToGuideClick" HorizontalAlignment="Left" Padding="8,4" Margin="0,4,0,0"/>
+                    </StackPanel>
+                  </Grid>
+                  <Grid x:Name="CompositionPreviewViewport">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="18"/></Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="18"/></Grid.RowDefinitions>
+                  <Border x:Name="OutputPreviewBorder" PreviewMouseWheel="CompositionWheel" PreviewMouseDown="CompositionPanDown" PreviewMouseUp="CompositionPanUp" Background="{Binding PreviewBackdrop, RelativeSource={RelativeSource AncestorType=Window}}" Padding="8" CornerRadius="5">
                     <Viewbox x:Name="CompositionViewbox" Stretch="Uniform" MaxHeight="320">
                       <Grid x:Name="CompositionSurface" Width="1920" Height="1080" ClipToBounds="True">
-                        <Image x:Name="GuideImage" Stretch="Fill" IsHitTestVisible="False"/>
-                        <Image x:Name="CombinedImage" Stretch="Fill" IsHitTestVisible="False"/>
-                        <Canvas x:Name="CompositionCanvas" Background="Transparent" Focusable="True" MouseLeftButtonDown="CompositionDown" MouseMove="CompositionMove" MouseLeftButtonUp="CompositionUp" LostMouseCapture="CompositionLostCapture" KeyDown="CompositionKeyDown"/>
+                        <Image Panel.ZIndex="0" x:Name="GuideImage" Opacity="{Binding Value, ElementName=GuideOpacity}" Stretch="Fill" IsHitTestVisible="False"/>
+                        <Image Panel.ZIndex="1" x:Name="CombinedImage" Stretch="Fill" IsHitTestVisible="False"/>
+                        <Canvas Panel.ZIndex="2" x:Name="CompositionCanvas" Background="Transparent" Focusable="True" MouseLeftButtonDown="CompositionDown" MouseMove="CompositionMove" MouseLeftButtonUp="CompositionUp" LostMouseCapture="CompositionLostCapture" KeyDown="CompositionKeyDown"/>
                       </Grid>
                     </Viewbox>
                   </Border>
+                    <ScrollBar x:Name="CompositionVerticalScroll" Grid.Column="1" Orientation="Vertical" Minimum="0" Maximum="0" SmallChange="0.02" ValueChanged="CompositionScrollChanged" AutomationProperties.Name="Pan output canvas vertically"/>
+                    <ScrollBar x:Name="CompositionHorizontalScroll" Grid.Row="1" Orientation="Horizontal" Minimum="0" Maximum="0" SmallChange="0.02" ValueChanged="CompositionScrollChanged" AutomationProperties.Name="Pan output canvas horizontally"/>
+                  </Grid>
+                  <WrapPanel x:Name="OffscreenFieldsNotice" Visibility="Collapsed" Margin="0,4,0,0">
+                    <TextBlock x:Name="OffscreenFieldsText" Foreground="#FFC766" VerticalAlignment="Center" Margin="0,0,12,6"/>
+                    <Button Content="Show all" Click="FitCompositionClick" Margin="0,0,12,6"/>
+                  </WrapPanel>
                 </StackPanel>
                 <ItemsControl x:Name="OutputCards">
                   <ItemsControl.ItemTemplate>
@@ -431,7 +468,7 @@
                     </DataTemplate>
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>
-                <Expander x:Name="ComparisonSection" Margin="0,14,0,0" Header="Before / After" IsExpanded="False" Style="{StaticResource InspectorSection}" Expanded="ComparisonChanged" Collapsed="ComparisonChanged">
+                <Expander x:Name="ComparisonSection" Margin="0,14,0,0" Header="Before / After" IsExpanded="True" Style="{StaticResource InspectorSection}" Expanded="ComparisonChanged" Collapsed="ComparisonChanged">
                   <StackPanel>
                     <TextBlock x:Name="ComparisonFieldName" FontWeight="SemiBold" FontSize="15" TextWrapping="Wrap" Margin="0,0,0,10"/>
                     <TextBlock x:Name="ComparisonEmpty" Text="Select a field on the left to compare its original crop and cleaned digits." Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,10"/>
@@ -454,7 +491,7 @@
                   </StackPanel>
                 </Expander>
                 <StackPanel Visibility="{Binding Visibility, ElementName=CombinedPanel}">
-                  <Expander Header="Layout actions" IsExpanded="False" Style="{StaticResource InspectorSection}" Margin="0,14,0,0"><WrapPanel x:Name="PlacementActions">
+                  <Expander Header="Layout actions" IsExpanded="True" Style="{StaticResource InspectorSection}" Margin="0,14,0,0"><WrapPanel x:Name="PlacementActions">
                     <Button Content="Place selected field" Click="PlaceOutputFieldClick"/>
                     <Button Content="Match field names to guide" Click="MatchGuideClick"/>
                   </WrapPanel>
@@ -462,7 +499,7 @@
                   <TextBlock x:Name="CombinedOutputName" FontWeight="SemiBold" Foreground="#8BC7FF" Margin="0,12,0,5"/>
                 </StackPanel>
 
-                <Expander Header="Connect to vMix" IsExpanded="False" Style="{StaticResource InspectorSection}" Margin="0,14,0,16">
+                <Expander Header="Connect to vMix" IsExpanded="True" Style="{StaticResource InspectorSection}" Margin="0,14,0,16">
                   <TextBlock x:Name="OutputInstructions" Text="Add Scoreboard - Combined in vMix. Layer it over your GT title at the same canvas size and position. Only live fields are transmitted; the guide and its placeholders stay out of the feed." Foreground="#A8D6FF" TextWrapping="Wrap" />
                 </Expander>
 
@@ -482,14 +519,14 @@
           </StackPanel>
         <ScrollViewer x:Name="InspectorScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch">
           <StackPanel x:Name="Inspector" Margin="0,0,10,0">
-            <Expander x:Name="FieldSection" Header="Field settings" IsExpanded="False" Style="{StaticResource InspectorSection}">
+            <Expander x:Name="FieldSection" Header="Field settings" IsExpanded="True" Style="{StaticResource InspectorSection}">
             <StackPanel>
             <TextBlock Text="Name" Margin="0,0,0,6" />
             <TextBox x:Name="FieldName" MaxLength="60" LostFocus="RenameField" KeyDown="NameKeyDown" />
             <CheckBox x:Name="FieldEnabled" Content="Include in NDI outputs" Click="CleanupChanged" />
             </StackPanel>
             </Expander>
-            <Expander x:Name="CropSection" Header="Crop position" IsExpanded="False" Style="{StaticResource InspectorSection}">
+            <Expander x:Name="CropSection" Header="Crop position" IsExpanded="True" Style="{StaticResource InspectorSection}">
             <StackPanel>
               <DockPanel><TextBlock Text="Left" FontSize="12"/><TextBlock x:Name="CropXValue" HorizontalAlignment="Right" Foreground="{StaticResource Muted}" FontSize="12"/></DockPanel>
               <Slider x:Name="CropX" Style="{StaticResource GeometrySlider}" Minimum="0" Maximum="100" SmallChange="0.1" LargeChange="1" ValueChanged="CropGeometryChanged" AutomationProperties.Name="Crop left"/>
@@ -502,7 +539,7 @@
             <TextBlock Text="Updates live. Arrow keys fine-tune the selected slider." TextWrapping="Wrap" FontSize="11" Foreground="{StaticResource Muted}" Margin="0,0,0,14"/>
             </StackPanel>
             </Expander>
-            <Expander x:Name="OutputPlacementInspector" Header="Output position" IsExpanded="False" Visibility="Collapsed" Style="{StaticResource InspectorSection}">
+            <Expander x:Name="OutputPlacementInspector" Header="Output position" IsExpanded="True" Visibility="Collapsed" Style="{StaticResource InspectorSection}">
             <StackPanel>
               <ComboBox x:Name="GuideTarget" SelectionChanged="GuideTargetChanged" Margin="0,0,0,7"/>
               <StackPanel x:Name="OutputGeometryControls">
@@ -520,7 +557,7 @@
             </StackPanel>
             </Expander>
 
-            <Expander x:Name="CleanupSection" Header="Background removal" IsExpanded="False" Style="{StaticResource InspectorSection}">
+            <Expander x:Name="CleanupSection" Header="Background removal" IsExpanded="True" Style="{StaticResource InspectorSection}">
             <StackPanel>
             <CheckBox x:Name="RemoveBackground" Content="Remove background" Click="CleanupChanged" />
             <TextBlock Text="Isolate digits using" Margin="0,4,0,6"/>
@@ -537,7 +574,7 @@
             <Slider x:Name="Softness" Minimum="1" Maximum="128" Value="32" ValueChanged="SliderChanged" />
             </StackPanel>
             </Expander>
-            <Expander x:Name="DigitAppearanceSection" Header="Digit appearance" IsExpanded="False" Style="{StaticResource InspectorSection}">
+            <Expander x:Name="DigitAppearanceSection" Header="Digit appearance" IsExpanded="True" Style="{StaticResource InspectorSection}">
             <StackPanel>
             <DockPanel>
               <TextBlock Text="Digit brightness" />
@@ -553,7 +590,7 @@
             <Button Click="PickDigitColorClick" Margin="0,7,0,8" ToolTip="Choose a custom shade. Applies at 1x brightness in both output modes."><StackPanel Orientation="Horizontal"><Border x:Name="DigitColorSwatch" Width="22" Height="18" Background="White" CornerRadius="3" Margin="0,0,10,0"/><TextBlock Text="Choose digit color…"/></StackPanel></Button>
             </StackPanel>
             </Expander>
-            <Expander x:Name="EdgeSection" Header="Edges and detail" IsExpanded="False" Style="{StaticResource InspectorSection}">
+            <Expander x:Name="EdgeSection" Header="Edges and detail" IsExpanded="True" Style="{StaticResource InspectorSection}">
             <StackPanel>
             <DockPanel Margin="0,8,0,0">
               <TextBlock Text="Edge thickness" />

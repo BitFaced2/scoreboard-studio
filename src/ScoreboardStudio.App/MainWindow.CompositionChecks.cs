@@ -76,7 +76,56 @@ public partial class MainWindow
             report.Add("PASS: automatic output placement, mode switch, manual addition, preserved edits, deliberate unplacement, save/reload and explicit restoration.");
             OpenLayout(Arg("--test-layout"));
             var crops=fields.ToDictionary(f=>f.Id,f=>f.Region);
+            // Reproduce loading a bottom-of-frame guide AFTER fields were placed
+            // in the upper canvas, without matching any names to guide targets.
+            OutputMode.SelectedIndex=0;WorkspaceTabs.SelectedIndex=1;
+            fields[0].OutputRegion=new(.03,.03,.2,.12);Changed();
+            var priorPlacement=fields.ToDictionary(f=>f.Id,f=>f.OutputRegion);
             LoadGuide(Arg("--guide-file"));
+            Require(fields.All(f=>f.OutputRegion==priorPlacement[f.Id]),"Loading guide moved existing placements.");
+            Require(fields.Count==priorPlacement.Count && fields.All(f=>f.Region==crops[f.Id]),
+                "Loading guide changed the fields or source crops.");
+            Require(CloseUpGuide.IsChecked==false && compositionView==new Crop(0,0,1,1) &&
+            OffscreenFieldsNotice.Visibility==Visibility.Collapsed,"Loading guide hid fields by automatically zooming in.");
+            await Until(()=>engine.Preview.Combined is {Width:1920,Height:1080},"Guide load did not produce combined fields.");
+            await Task.Delay(200);RefreshPreview();UpdateLayout();
+            Require(CompositionCanvas.Children.OfType<System.Windows.Controls.TextBlock>().Any(t=>t.Text==fields[0].Name),
+                "Existing field has no selectable outline immediately after guide load.");
+            Require(FrameProcessor.Crop(engine.Preview.Combined!,compositionView).Pixels.Where((_,i)=>i%4==3).Any(a=>a>200),
+                "No live digit pixels immediately after guide load.");
+            CompositionPreviewViewport.BringIntoView();UpdateLayout();
+            CaptureWindow(Path.Combine(directory,"guide-loaded-full-canvas.png"));
+            double fullCanvasUnits=CompositionUnits(1);
+            CloseUpGuide.IsChecked=true;CompositionViewChanged(CloseUpGuide,new());UpdateLayout();
+            var guideBounds=scorebugGuide!.Bounds;
+            Require(fullCanvasUnits/CompositionUnits(1)>3,
+                "Close-up did not enlarge the guide: distant fields still limit magnification.");
+            Require(ContainsPoint(compositionView,new(guideBounds.X,guideBounds.Y)) &&
+                ContainsPoint(compositionView,new(guideBounds.X+guideBounds.Width,guideBounds.Y+guideBounds.Height)),
+                "Close-up clipped guide artwork.");
+            Require(OffscreenFieldsNotice.Visibility==Visibility.Visible,"Close-up did not identify offscreen fields.");
+            await Until(()=>engine.Preview.Combined is {Width:1920,Height:1080},"Guide load did not produce combined fields.");
+            await Task.Delay(200);RefreshPreview();UpdateLayout();
+            CompositionPreviewViewport.BringIntoView();UpdateLayout();
+            CaptureWindow(Path.Combine(directory,"guide-close-up.png"));
+            CheckGuideNavigation(report,directory);
+            var zoomOut=new MouseWheelEventArgs(Mouse.PrimaryDevice,0,-120*32){RoutedEvent=Mouse.PreviewMouseWheelEvent};
+            CompositionCanvas.RaiseEvent(zoomOut);
+            Require(zoomOut.Handled && compositionView==new Crop(0,0,1,1),
+                "Wheel zoom could not escape guide close-up to recover distant fields.");
+            FitCompositionClick(this,new());
+            Require(compositionView==new Crop(0,0,1,1) && OffscreenFieldsNotice.Visibility==Visibility.Collapsed,
+                "Show all did not restore the whole canvas and clear the notice.");
+            Require(CompositionCanvas.Children.OfType<System.Windows.Controls.TextBlock>().Any(t=>t.Text==fields[0].Name),"Off-guide field has no selectable outline after Show all.");
+            var visibleDigits=FrameProcessor.Crop(engine.Preview.Combined!,compositionView);
+            Require(visibleDigits.Pixels.Where((_,i)=>i%4==3).Any(a=>a>200),"Show all contains no live digit pixels after loading guide.");
+            CaptureWindow(Path.Combine(directory,"guide-loaded-existing-fields.png"));
+            FieldList.SelectedItem=fields[0];ZoomSelectedClick(this,new());
+            Require(ContainsPoint(compositionView,new(.13,.09)),"Zoom to selected did not recover the off-guide field.");
+            CloseUpGuide.IsChecked=true;CompositionViewChanged(CloseUpGuide,new());
+            Require(OffscreenFieldsNotice.Visibility==Visibility.Visible && fields.All(f=>f.OutputRegion==priorPlacement[f.Id] && f.Region==crops[f.Id]),
+                "Returning to close-up lost the offscreen notice or changed field geometry.");
+            report.Add("PASS: Close-up enlarges the guide despite distant fields; wheel zoom recovers the full canvas, Fit canvas and Zoom to selected work, and all crops and placements remain unchanged.");
             Require(scorebugGuide?.Slots.Count==8&&outputSettings.Width==1920&&outputSettings.Height==1080,"Tipoff guide geometry did not load.");
             var digitStyles=fields.ToDictionary(f=>f.Id,f=>f.Cleanup);
             WorkspaceTabs.SelectedIndex=1;MatchGuideClick(this,new());
@@ -94,6 +143,10 @@ public partial class MainWindow
             int background=(800*1920+420)*4+3;
             Require(scorebugGuide.Image.Pixels[background]>0&&engine.Preview.Combined!.Pixels[background]==0,"Guide artwork entered the output.");
             var home=fields.First(f=>f.Name=="Home score");FieldList.SelectedItem=home;
+            CheckEditingKeepsZoom(report);
+            // Let the worker finish restoring the edited fixture before pixel comparisons.
+            await Task.Delay(200);RefreshPreview();
+            CheckCompositionZoomAndLayers(report,directory);
             var before=home.OutputRegion!;
             CompositionKeyDown(this,new KeyEventArgs(Keyboard.PrimaryDevice,PresentationSource.FromVisual(this)!,0,Key.Right){RoutedEvent=Keyboard.KeyDownEvent});
             Require(Math.Abs(home.OutputRegion!.X-before.X-1.0/1920)<.000001&&home.Region==crops[home.Id],"Keyboard positioning changed the crop or moved the wrong distance.");
@@ -135,6 +188,7 @@ public partial class MainWindow
             savePath=Path.Combine(directory,"tipoff.scoreboard.json");Require(SaveSetup(),"Combined setup could not be saved.");
             OpenLayout(savePath);await Until(()=>engine.Preview.Combined is not null,"Saved canvas did not restore.");
             Require(outputSettings.Mode=="Combined"&&scorebugGuide?.Slots.Count==8&&fields.Count(f=>f.OutputRegion is not null)==8&&!output,"Combined layout did not round-trip with outputs stopped.");
+            Require(CloseUpGuide.IsChecked==false && compositionView==new Crop(0,0,1,1),"Restoring a guide layout automatically hid fields with close-up.");
             var missing=Layout.Load(savePath);missing.Output.GuidePath="missing-guide.gtzip";string missingPath=Path.Combine(directory,"missing-guide.scoreboard.json");missing.Save(missingPath);
             OpenLayout(missingPath);Require(scorebugGuide is null&&guideWarning is not null&&fields.Count(f=>f.OutputRegion is not null)==8,"Missing guide discarded the saved layout.");
             OpenLayout(Path.Combine(directory,"tipoff.scoreboard.json"));
@@ -150,7 +204,7 @@ public partial class MainWindow
                 Require(received!.Pixels[background]<10,"Guide artwork leaked into NDI.");
                 OutputClick(this,new());await Until(()=>engine.Preview.OutputCount==0,"NDI output did not stop.");report.Add("PASS: one full-HD NDI input contains all eight placed fields and transparency, without guide artwork.");
             }
-            FieldList.SelectedItem=fields.First(f=>f.Name=="Game clock");WorkspaceTabs.SelectedIndex=1;RefreshPreview();UpdateLayout();CaptureWindow(Path.Combine(directory,"combined-editor.png"));
+            FieldList.SelectedItem=fields.First(f=>f.Name=="Game clock");WorkspaceTabs.SelectedIndex=1;RefreshPreview();UpdateLayout();CompositionPreviewViewport.BringIntoView();await Task.Delay(100);CaptureWindow(Path.Combine(directory,"combined-editor.png"));
             if(args.Contains("--video-file"))
             {
                 LoadMedia(Arg("--video-file"));await Until(()=>engine.Preview.Source is not null&&engine.Preview.Healthy,"Video did not open.");await Task.Delay(800);
@@ -179,8 +233,11 @@ public partial class MainWindow
                 }
                 process.Refresh();long growth=process.PrivateMemorySize64-memoryBefore;
                 Require(growth<250L*1024*1024,"Combined playback memory grew excessively.");
-                report.Add($"PASS: recorded video updates one transparent combined NDI feed; 20-second check, private memory change {growth/1048576} MiB.");
+                report.Add(args.Contains("--ndi")
+                    ? $"PASS: recorded video updates one transparent combined NDI feed; 20-second check, private memory change {growth/1048576} MiB."
+                    : $"PASS: recorded video updates the combined preview; private memory change {growth/1048576} MiB.");
             }
+            await CheckTwoDistantFields(report,directory);
             File.WriteAllLines(Path.Combine(directory,"composition-checks.txt"),report);
         }
         catch(Exception ex){File.WriteAllText(Path.Combine(directory,"composition-error.txt"),ex.ToString());Environment.ExitCode=1;}

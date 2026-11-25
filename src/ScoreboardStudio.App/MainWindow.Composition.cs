@@ -38,7 +38,8 @@ public partial class MainWindow
         OutputCards.Visibility=combined?Visibility.Collapsed:Visibility.Visible;
         CanvasWidthBox.Text=outputSettings.Width.ToString();CanvasHeightBox.Text=outputSettings.Height.ToString();
         OutputMode.IsEnabled=OutputLayoutControls.IsEnabled=PlacementActions.IsEnabled=!locked;
-        GuideInfo.Text=guideWarning ?? (scorebugGuide is null?"Load a GTZIP or image guide. The guide never appears in the NDI feed.":Path.GetFileName(guidePath)+" • "+scorebugGuide.Slots.Count+" targets. "+scorebugGuide.Notes);
+        GuideInfo.Text=guideWarning is not null?"Guide unavailable":scorebugGuide is null?"No guide loaded":Path.GetFileName(guidePath);
+        GuideInfo.ToolTip=guideWarning ?? (scorebugGuide is null?"Load a GTZIP or image guide. Preview only.":scorebugGuide.Slots.Count+" targets. "+scorebugGuide.Notes);
         CombinedOutputName.Text=VideoEngine.OutputName(kind,"Combined")+$"  •  {outputSettings.Width} × {outputSettings.Height}";
         OutputInstructions.Text=combined?"In vMix, add the combined NDI feed and layer it over your GT title at the same full-canvas size and position. Clear the GT title's live-value text (scores, clock, period, fouls, timeouts) so it does not show behind the video digits. Guide artwork is never transmitted.":"Legacy mode: add each enabled field as a separate NDI input in vMix and position it over the GT title.";
         compositionUpdating=false;
@@ -84,7 +85,8 @@ public partial class MainWindow
         scorebugGuide=guide;guidePath=Path.GetFullPath(path);guideWarning=null;
         output=false;OutputButton.Content="Start NDI outputs";
         outputSettings=outputSettings with {Mode="Combined",Width=guide.Image.Width,Height=guide.Image.Height};
-        CloseUpGuide.IsChecked=true;
+        // Keep existing fields in view. Guide close-up is an explicit editing action.
+        CloseUpGuide.IsChecked=false;ResetCompositionZoom();
         PlaceNewOutputFields();
         Changed();SyncComposition();
         Notice.Text="Guide loaded. Select a field and choose its target, or use Match field names to guide. Existing crops and placements are retained. The guide is preview-only.";
@@ -92,7 +94,7 @@ public partial class MainWindow
     private void ClearGuideClick(object sender,RoutedEventArgs e)
     {
         if(locked)return;
-        scorebugGuide=null;guidePath=null;guideWarning=null;CloseUpGuide.IsChecked=false;Changed();SyncComposition();
+        scorebugGuide=null;guidePath=null;guideWarning=null;CloseUpGuide.IsChecked=false;ResetCompositionZoom();Changed();SyncComposition();
     }
     private void ApplyCanvasSizeClick(object sender,RoutedEventArgs e)
     {
@@ -102,17 +104,31 @@ public partial class MainWindow
         output=false;OutputButton.Content="Start NDI outputs";outputSettings=outputSettings with {Width=w,Height=h};Changed();SyncComposition();
         Notice.Text="Canvas size changed. Review placement and use matching full-canvas geometry in vMix before starting outputs.";
     }
-    private void CompositionViewChanged(object sender,RoutedEventArgs e) {if(ready)UpdateCompositionView();}
+    private void CompositionViewChanged(object sender,RoutedEventArgs e)
+    {
+        if(!ready)return;
+        if(ReferenceEquals(sender,CloseUpGuide))
+        {
+            if(CloseUpGuide.IsChecked==true && scorebugGuide is not null)FrameComposition(scorebugGuide.Bounds,1.08);
+            else ResetCompositionZoom();
+        }
+        UpdateCompositionView();
+    }
     private void UpdateCompositionView()
     {
         if(!ready)return;
-        compositionView=CloseUpGuide.IsChecked==true&&scorebugGuide is not null?scorebugGuide.Bounds:new(0,0,1,1);
+        compositionView=ZoomedCompositionView();
         // Match the integer crop used by the preview to its mouse coordinate system.
-        int x=(int)(compositionView.X*outputSettings.Width),y=(int)(compositionView.Y*outputSettings.Height);
-        int w=Math.Clamp((int)Math.Round(compositionView.Width*outputSettings.Width),1,outputSettings.Width-x),h=Math.Clamp((int)Math.Round(compositionView.Height*outputSettings.Height),1,outputSettings.Height-y);
+        int w=Math.Clamp((int)Math.Round(compositionView.Width*outputSettings.Width),1,outputSettings.Width);
+        int h=Math.Clamp((int)Math.Round(compositionView.Height*outputSettings.Height),1,outputSettings.Height);
+        int x=Math.Clamp((int)Math.Round(compositionView.X*outputSettings.Width),0,outputSettings.Width-w);
+        int y=Math.Clamp((int)Math.Round(compositionView.Y*outputSettings.Height),0,outputSettings.Height-h);
         compositionView=new(x/(double)outputSettings.Width,y/(double)outputSettings.Height,w/(double)outputSettings.Width,h/(double)outputSettings.Height);
         CompositionSurface.Width=w;CompositionSurface.Height=h;
+        CompositionZoomLabel.Text=$"{CompositionZoom.Value:0.##}×";
         UpdateImage(GuideImage,scorebugGuide is not null&&ShowGuide.IsChecked==true?FrameProcessor.Crop(scorebugGuide.Image,compositionView):null);
+        UpdateImage(OverviewGuide,scorebugGuide is not null&&ShowGuide.IsChecked==true?scorebugGuide.Image:null);
+        UpdateCompositionNavigation();
         lastCompositePreview=null;RefreshCompositionPreview();RenderCompositionBoxes();
     }
     private void RefreshCompositionPreview()
@@ -120,7 +136,7 @@ public partial class MainWindow
         if(!ready||WorkspaceTabs.SelectedIndex!=1||outputSettings.Mode!="Combined")return;
         var frame=engine.Preview.Combined;
         if(!ReferenceEquals(frame,lastCompositePreview))
-        {lastCompositePreview=frame;UpdateImage(CombinedImage,frame is null?null:compositionView==new Crop(0,0,1,1)?frame:FrameProcessor.Crop(frame,compositionView));}
+        {lastCompositePreview=frame;UpdateImage(CombinedImage,frame is null?null:compositionView==new Crop(0,0,1,1)?frame:FrameProcessor.Crop(frame,compositionView));UpdateImage(OverviewFields,frame);}
     }
     private void SetSlot(ScoreField field,GuideSlot slot)
     {field.OutputRegion=slot.Region;field.OutputPlacementInitialized=true;field.OutputSlot=slot.Name;field.OutputColor=null;}
@@ -164,10 +180,9 @@ public partial class MainWindow
     private void OutputFrontClick(object sender,RoutedEventArgs e)
     {if(!locked&&Selected is {} field){fields.Move(fields.IndexOf(field),fields.Count-1);SyncFields();Changed();}}
     private Point CompositionPoint(MouseEventArgs e)
-    {
-        var point=e.GetPosition(CompositionCanvas);
-        return new(Math.Clamp(compositionView.X+point.X/outputSettings.Width,0,1),Math.Clamp(compositionView.Y+point.Y/outputSettings.Height,0,1));
-    }
+        => CompositionPoint(e.GetPosition(CompositionCanvas));
+    private Point CompositionPoint(Point point)
+        => new(Math.Clamp(compositionView.X+point.X/outputSettings.Width,0,1),Math.Clamp(compositionView.Y+point.Y/outputSettings.Height,0,1));
     private double CompositionUnits(double screenPixels)
     {
         double scale=Math.Min(CompositionViewbox.ActualWidth/CompositionSurface.Width,CompositionViewbox.ActualHeight/CompositionSurface.Height);
@@ -175,6 +190,7 @@ public partial class MainWindow
     }
     private void CompositionDown(object sender,MouseButtonEventArgs e)
     {
+        if(Keyboard.IsKeyDown(Key.Space))return;
         if(locked)return;var point=CompositionPoint(e);
         double hitX=CompositionUnits(FieldCornerGrabRadius)/outputSettings.Width,hitY=CompositionUnits(FieldCornerGrabRadius)/outputSettings.Height;
         var field=Selected is {OutputRegion:{} active} selected && HitResizeCorner(active,point,hitX,hitY)>=0 ? selected :
@@ -187,6 +203,7 @@ public partial class MainWindow
     }
     private void CompositionMove(object sender,MouseEventArgs e)
     {
+        if(compositionPanning){PanComposition(e);return;}
         if(locked)return;
         var p=CompositionPoint(e);
         if(!compositionDragging)
@@ -209,9 +226,10 @@ public partial class MainWindow
     private void CompositionUp(object sender,MouseButtonEventArgs e)
     {if(!compositionDragging)return;compositionDragging=false;CompositionCanvas.Cursor=Cursors.Arrow;CompositionCanvas.ReleaseMouseCapture();Changed();SyncComposition();}
     private void CompositionLostCapture(object sender,MouseEventArgs e)
-    {if(compositionDragging){compositionDragging=false;CompositionCanvas.Cursor=Cursors.Arrow;Changed();SyncComposition();}}
+    {compositionPanning=false;CompositionCanvas.Cursor=Cursors.Arrow;if(compositionDragging){compositionDragging=false;Changed();SyncComposition();}}
     private void CompositionKeyDown(object sender,KeyEventArgs e)
     {
+        if(e.Key==Key.Space){e.Handled=true;return;}
         if(locked||Selected is not {} field||field.OutputRegion is not {} r)return;
         int step=Keyboard.Modifiers.HasFlag(ModifierKeys.Shift)?10:1;
         double dx=e.Key==Key.Left?-step:e.Key==Key.Right?step:0,dy=e.Key==Key.Up?-step:e.Key==Key.Down?step:0;
@@ -220,7 +238,7 @@ public partial class MainWindow
     }
     private void RenderCompositionBoxes()
     {
-        if(!ready)return;CompositionCanvas.Children.Clear();if(locked)return;
+        if(!ready)return;UpdateOffscreenFields();RenderCompositionOverview();CompositionCanvas.Children.Clear();if(locked)return;
         double units=CompositionUnits(1);
         void Box(Crop r,string name,string color,bool selected,bool target)
         {
@@ -253,7 +271,7 @@ public partial class MainWindow
             }
             catch(Exception ex){guideWarning="Guide unavailable: "+ex.Message+" Saved field positions are retained. Load the guide again if needed.";}
         }
-        CloseUpGuide.IsChecked=scorebugGuide is not null;
+        CloseUpGuide.IsChecked=false;ResetCompositionZoom();
         SyncComposition();
     }
 }

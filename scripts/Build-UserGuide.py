@@ -138,7 +138,7 @@ left=para('Connect an NDI source, or use <b>Load image or video</b>. Select the 
 left=heading('2 / Two work areas',left,48,245)
 left=para('<b>Fields:</b> camera setup and crop boxes. <b>Outputs:</b> appearance, placement and NDI. Expand <b>Before / After</b> to compare the selected field.',48,left,245,10)
 right=heading('3 / Field settings',right,319,245)
-right=para('Six groups separate field settings, crop, output position, background removal, digit appearance and edges. All start collapsed; click a heading to open it.',319,right,245,10)-12
+right=para('Six groups separate field settings, crop, output position, background removal, digit appearance and edges. All start expanded; click a heading to collapse or reopen it.',319,right,245,10)-12
 right=heading('4 / Top and bottom bars',right,319,245)
 right=para('Save or load a setup, lock editing and start outputs. The bottom bar shows output status.',319,right,245,10)
 
@@ -247,10 +247,10 @@ y=step(4,'Review your restored setup','The app reopens your saved setup with out
 note('Getting the updater for the first time','Versions before 0.5.0 need one final manual GitHub ZIP download. Extract it and open the new executable; no uninstall is needed. Later updates use this window. Failed downloads leave the app unchanged, and ordinary installation write failures restore the previous files. Use <b>GitHub downloads</b> in the update window for a manual fallback.',y)
 
 y=begin(12,'One input, editable fields','Edit the live fields in Scoreboard Studio while keeping your GT artwork in vMix.')
-y=picture(SHOT/'combined-editor.png',48,y,516,215)-10
-y=step(1,'Load your scorebug guide','In Outputs, select <b>Single Input</b>. Open <b>Scorebug guide and canvas</b>, then <b>Load scorebug guide</b>. GTZIP targets and the canvas size are read from the file. PNG/JPEG/BMP guides are also supported. The guide and its placeholder values are never transmitted.',y)
-y=step(2,'Place and adjust the fields','New fields appear automatically using <b>Stretch to box</b>. Existing boxes and saved sizing choices stay unchanged. Select a field on the left; drag to move or use any of its four round corner pins to resize. Choose a guide target or use <b>Match field names to guide</b> for title alignment. Crop and output sliders update live. Arrow keys adjust by 0.1% or 1 pixel. Output position stays independent of the source crop.',y)
-y=step(3,'Review what will be sent','Only enabled, placed fields are sent. <b>Unplace</b> keeps a field off the canvas until <b>Place selected field</b> restores it. <b>Bring to front</b> changes overlap order. Close-up and Show guide affect only the editor. Save the setup, then add the combined input in vMix as described on page 6.',y)
+y=picture(SHOT/'combined-editor.png',48,y,516,190)-10
+y=step(1,'Load your scorebug guide','In Outputs, select <b>Single Input</b>. Click <b>Load scorebug guide</b> in the <b>Output preview</b> toolbar. GTZIP targets and the canvas size are read from the file. PNG/JPEG/BMP guides are also supported. Loading a guide keeps the full canvas visible. Close-up enlarges the guide without moving crops or output fields. The <b>Whole canvas</b> overview shows every field. <b>Find a field</b>, canvas scrollbars and <b>Go to guide</b> navigate at the current zoom. The guide is never transmitted.',y)
+y=step(2,'Place and adjust the fields','New fields use <b>Stretch to box</b>; saved choices stay unchanged. Select a field, then drag to move or use any round corner pin to resize. Choose a guide target or <b>Match field names to guide</b> for alignment. Crop and output sliders update live, independently. Arrow keys adjust by 0.1% or 1 pixel.',y)
+y=step(3,'Zoom and review','The <b>scroll wheel</b> zooms around the pointer; Space + drag pans. <b>Zoom to selected</b> enlarges tiny fields; <b>Fit canvas</b> resets the view. <b>Guide opacity</b> dims artwork behind digits. These controls affect only the editor. Only enabled, placed fields are sent. <b>Unplace</b> hides a field; <b>Place selected field</b> restores it. <b>Bring to front</b> changes overlap order. Save, then add the combined input in vMix (page 6).',y)
 note('Tipoff title and saved setups','Clear the live-value text in a copy of your GT title before layering the NDI fields over it. GT titles are supplied separately and are not included in the app download. Keep the guide and footage with the saved setup when moving computers. New saves require version 0.6.0 or newer; old setups load in legacy mode.',y)
 
 assert len(pages)==12

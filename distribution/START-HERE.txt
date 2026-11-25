@@ -23,9 +23,9 @@ FIND YOUR CONTROLS
 
 Expand NDI source for connection controls. Media file holds file loading and
 playback. Under Fields, Camera setup holds straightening and stabilization;
-Field detection holds detection options. Under Outputs, Scorebug guide and
-canvas holds guide loading and canvas size. Layout actions and Connect to vMix
-contain secondary tools and instructions. These groups start collapsed.
+Field detection holds detection options. Under Outputs, the Output preview
+toolbar holds guide loading and canvas size. Layout actions and Connect to vMix
+contain secondary tools and instructions. These groups start expanded.
 
 LOAD YOUR FOOTAGE
 
@@ -53,7 +53,7 @@ Name each field and draw a box around any field that was missed.
 Crop and output sliders apply immediately, with values shown beside them.
 Click the larger section headings in the right panel to expand or collapse
 Field settings, Crop position, Output position, Background removal,
-Digit appearance, and Edges and detail. All start collapsed. Your choices stay
+Digit appearance, and Edges and detail. All start expanded. Your choices stay
 in place when switching fields or tabs during the session.
 Arrow keys fine-tune: crop 0.1 percent, output 1 pixel. No Apply click is needed.
 Find fields provides suggestions you can review and accept explicitly.
@@ -137,6 +137,11 @@ SEND TO VMIX
 Older setups retain Separate Inputs. Change mode explicitly
 to use one input. New saved setups require version 0.6.0 or newer. Setups
 reference the guide and footage; copy those files when moving computers.
+
+Scroll the mouse wheel over the output preview to zoom around the pointer.
+Use Zoom to selected for tiny fields and Fit canvas to reset the view.
+Space + drag or middle-button drag pans. Guide opacity dims the artwork behind
+the digits. These controls affect only the editor; NDI stays full size.
 For coordinated animation, transition the completed composition together.
 
 The source dropdown lists NDI feeds only. Cameras and capture cards must be
@@ -164,3 +169,11 @@ OUTPUT LAYOUT
 New fields default to Stretch to box. Saved sizing choices are preserved.
 Output mode sits beside the output preview checkboxes and wraps on small screens.
 Before / After is below the output preview.
+
+Guide loading and canvas size are in the Output preview toolbar.
+Loading a guide or reopening a setup shows the full canvas to keep fields visible.
+Close-up enlarges the scorebug guide without moving any crops or output fields.
+Every placed field stays visible in the Whole canvas overview. Click its name under
+Find a field to reach it at the current zoom; Go to guide returns to the artwork.
+Use the canvas scrollbars or click the overview to navigate without moving fields. Show all and Fit canvas restore the full canvas.
+Manual zooming or panning leaves the Close-up preset; click it again to return.
